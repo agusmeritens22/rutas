@@ -1,4 +1,4 @@
-// FIX: Abre/Cierra se conservan al reparsear y se muestran en el cronograma
+// Columna "Local" + FIX de ventanas: conserva Abre/Cierra/Estadía y muestra en cronograma
 const $ = (id) => document.getElementById(id);
 
 let points = []; let startPoint = null; let debounceTimer = null;
@@ -9,18 +9,18 @@ function parseHHMM(s){ if(!s) return null; const m=s.match(/^(\d{1,2}):(\d{2})$/
 function minutesToHHMM(total){ total=Math.round(total); let hh=Math.floor(total/60)%24; let mm=total%60; return String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0'); }
 
 // ====== Named routes ======
-const LS_KEY='saved_routes_timewin_v2fix';
+const LS_KEY='saved_routes_timewin_v3_local';
 const loadSavedRoutes=()=>{ try{return JSON.parse(localStorage.getItem(LS_KEY)||'[]');}catch{return[];} };
 const saveSavedRoutes=(arr)=> localStorage.setItem(LS_KEY, JSON.stringify(arr));
 function refreshSavedSelect(){ const sel=$("savedSelect"); const arr=loadSavedRoutes(); sel.innerHTML=''; arr.forEach(r=>{ const o=document.createElement('option'); o.value=r.id; o.textContent=`${r.name} (${(r.points||[]).length} pts)`; sel.appendChild(o); }); }
 function captureRouteObject(name){
   return { id:'r_'+Date.now(), name:name||'Ruta sin nombre', created_at:new Date().toISOString(),
     textarea:$("links").value,
-    points: points.map(p=>({ name:p.name||p.address||'', address:p.address||'', lat:p.lat, lng:p.lng, precision:p.precision||null, dwell: p.dwell||0, open:p.open||'', close:p.close||'' })) };
+    points: points.map(p=>({ local:p.local||'', name:p.name||p.address||'', address:p.address||'', lat:p.lat, lng:p.lng, precision:p.precision||null, dwell: p.dwell||0, open:p.open||'', close:p.close||'' })) };
 }
 function applyRouteObject(r){
   $("routeName").value=r.name||''; $("links").value=r.textarea||'';
-  points=(r.points||[]).map((p,i)=>({ id:i+1, name:p.name||p.address||'', address:p.address||'', lat:p.lat, lng:p.lng, precision:p.precision||null, dwell:p.dwell||0, open:p.open||'', close:p.close||'' }));
+  points=(r.points||[]).map((p,i)=>({ id:i+1, local:p.local||'', name:p.name||p.address||'', address:p.address||'', lat:p.lat, lng:p.lng, precision:p.precision||null, dwell:p.dwell||0, open:p.open||'', close:p.close||'' }));
   renderInputTable(); setStatus('Ruta cargada.');
 }
 function onSaveNamed(){ const name=($("routeName").value||'').trim(); if(!name) return alert('Poné un nombre.');
@@ -37,20 +37,33 @@ function onImportNamed(file){ const rd=new FileReader(); rd.onload=()=>{ try{ co
 
 // ====== Parse / geocode ======
 function extractHouseNumber(s){ if(!s) return null; const m=s.match(/(\b\d{1,5}\b)(?!.*\b\d{1,5}\b)/); return m?m[1]:null; }
+function parseNameAndAddress(line) {
+  // Permite "Local | Dirección" o "Local - Dirección"; si no hay separador, devuelve solo address
+  const m = line.split('|');
+  if (m.length >= 2) return { local: m[0].trim(), address: m.slice(1).join('|').trim() };
+  const dash = line.split(' - ');
+  if (dash.length >= 2) return { local: dash[0].trim(), address: dash.slice(1).join(' - ').trim() };
+  return { local: '', address: line.trim() };
+}
 function parseLine(raw){
   const t=(raw||'').trim(); if(!t) return null;
-  let m=t.match(/^\s*(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)\s*$/); if(m) return {lat:parseFloat(m[1]), lng:parseFloat(m[2]), source:'coords', address:null};
+  // coords
+  let m=t.match(/^\s*(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)\s*$/); if(m) return {lat:parseFloat(m[1]), lng:parseFloat(m[2]), source:'coords', address:null, local:''};
+  // url
   if(/^https?:\/\//i.test(t)){
     try{ const u=new URL(t);
-      m=t.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/); if(m) return {lat:parseFloat(m[1]), lng:parseFloat(m[2]), source:'@', address:null};
-      m=t.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/); if(m) return {lat:parseFloat(m[1]), lng:parseFloat(m[2]), source:'!3d!4d', address:null};
-      const q=u.searchParams.get('q'); if(q){ const qm=q.match(/(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/); if(qm) return {lat:parseFloat(qm[1]), lng:parseFloat(qm[2]), source:'q', address:null}; }
+      m=t.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/); if(m) return {lat:parseFloat(m[1]), lng:parseFloat(m[2]), source:'@', address:null, local:''};
+      m=t.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/); if(m) return {lat:parseFloat(m[1]), lng:parseFloat(m[2]), source:'!3d!4d', address:null, local:''};
+      const q=u.searchParams.get('q'); if(q){ const qm=q.match(/(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/); if(qm) return {lat:parseFloat(qm[1]), lng:parseFloat(qm[2]), source:'q', address:null, local:''}; }
       const origin=u.searchParams.get('origin'); const dest=u.searchParams.get('destination'); const wps=u.searchParams.get('waypoints');
       const parts=[]; if(origin) parts.push(origin); if(wps) wps.split('|').forEach(p=>parts.push(p)); if(dest) parts.push(dest);
-      if(parts.length) return {multi:parts.map(decodeURIComponent), source:'dir'}; return {address:t, source:'url-address'};
+      if(parts.length) return {multi:parts.map(decodeURIComponent), source:'dir'};
+      return {address:t, source:'url-address', local:''};
     }catch(_){}
   }
-  return {address:t, source:'text-address'};
+  // texto libre: permitir "Local | Dirección"
+  const pa = parseNameAndAddress(t);
+  return {address: pa.address, source:'text-address', local: pa.local};
 }
 
 function parseAll(){
@@ -58,7 +71,7 @@ function parseAll(){
   const defOpen = $("defaultOpen").value || '';
   const defClose = $("defaultClose").value || '';
 
-  const prev = points.slice(); // copiar puntos previos para preservar campos
+  const prev = points.slice(); // para preservar campos editados
   function findPrevLike(obj){
     const key = (obj.address||obj.name||'').trim().toLowerCase();
     let cand = prev.find(p=> ((p.address||p.name||'').trim().toLowerCase())===key );
@@ -76,10 +89,11 @@ function parseAll(){
     if(info.multi && info.multi.length){
       info.multi.forEach(seg=>{
         const m=seg.match(/^\s*(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)\s*$/);
-        const obj = { id:id++, name: m? null: seg, address: m? null: seg, lat: m? parseFloat(m[1]): null, lng: m? parseFloat(m[2]): null };
+        const obj = { id:id++, local:'', name: m? null: seg, address: m? null: seg, lat: m? parseFloat(m[1]): null, lng: m? parseFloat(m[2]): null };
         const old = findPrevLike(obj);
         out.push({
           ...obj,
+          local: old? (old.local||'') : '',
           dwell: old? (old.dwell||0) : defD,
           open:  old? (old.open||'')  : defOpen,
           close: old? (old.close||'') : defClose,
@@ -87,20 +101,22 @@ function parseAll(){
         });
       });
     } else if(info.address){
-      const obj = { id:id++, name: info.address, address: info.address, lat: null, lng: null };
+      const obj = { id:id++, local: info.local||'', name: info.address, address: info.address, lat: null, lng: null };
       const old = findPrevLike(obj);
       out.push({
         ...obj,
+        local: (info.local||'') || (old? (old.local||''): ''),
         dwell: old? (old.dwell||0) : defD,
         open:  old? (old.open||'')  : defOpen,
         close: old? (old.close||'') : defClose,
         precision: old? (old.precision||null): null
       });
     } else {
-      const obj = { id:id++, name: '', address: null, lat: info.lat, lng: info.lng };
+      const obj = { id:id++, local:'', name: '', address: null, lat: info.lat, lng: info.lng };
       const old = findPrevLike(obj);
       out.push({
         ...obj,
+        local: old? (old.local||'') : '',
         dwell: old? (old.dwell||0) : defD,
         open:  old? (old.open||'')  : defOpen,
         close: old? (old.close||'') : defClose,
@@ -137,12 +153,11 @@ async function geocodeMissing(){
   setStatus(`Geocodificación completa (${c} resueltas).`);
 }
 
-// ====== Distancias ======
+// ====== Distancias / ruteo ======
 function haversine(a,b){ if(!a||!b) return Infinity; const R=6371,toRad=d=>d*Math.PI/180;
   const dLat=toRad(b.lat-a.lat), dLng=toRad(b.lng-a.lng), lat1=toRad(a.lat), lat2=toRad(b.lat);
   const h=Math.sin(dLat/2)**2 + Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLng/2)**2; return 2*R*Math.atan2(Math.sqrt(h),Math.sqrt(1-h)); }
 
-// ====== Routing con ventanas ======
 function planWithTimeWindows(stops, start, avgSpeedKmh, startMinutes){
   const remaining = stops.slice();
   const route = [];
@@ -206,6 +221,7 @@ function renderInputTable(){
     const dwell = Math.max(0, parseInt(p.dwell||0,10));
     tr.innerHTML=`
       <td class="py-2 pr-3 text-slate-500">${idx+1}</td>
+      <td class="py-2 pr-3"><input data-id="${p.id||idx+1}" data-field="local" type="text" value="${(p.local||'').replace(/"/g,'&quot;')}" class="w-48 p-1 border rounded text-xs" placeholder="Nombre del local" /></td>
       <td class="py-2 pr-3">${name}</td>
       <td class="py-2 pr-3">${typeof p.lat==='number'? p.lat.toFixed(6): ''}</td>
       <td class="py-2 pr-3">${typeof p.lng==='number'? p.lng.toFixed(6): ''}</td>
@@ -222,6 +238,7 @@ function renderInputTable(){
       const field=e.target.getAttribute('data-field');
       const p=points.find(x=>String(x.id)===String(id));
       if(!p) return;
+      if(field==='local'){ p.local = e.target.value||''; }
       if(field==='dwell'){ p.dwell = Math.max(0, parseInt(e.target.value||'0',10)); }
       if(field==='open'){ p.open = e.target.value||''; }
       if(field==='close'){ p.close = e.target.value||''; }
@@ -256,9 +273,10 @@ function renderResults(order, startMin, avgSpeed, circular){
   const rowsHtml = order.map((p,i)=>{
     const eta = p.__eta ?? startMin;
     const dep = p.__dep ?? (eta + Math.max(0, parseInt(p.dwell||0,10)));
+    const label = (p.local && p.local.trim()) ? `${p.local} — ${(p.name||p.address||'')}` : (p.name||p.address||'');
     return `<tr class="border-b">
       <td class="py-1 pr-2">${i+1}</td>
-      <td class="py-1 pr-2">${(p.name||p.address||'')}</td>
+      <td class="py-1 pr-2">${label}</td>
       <td class="py-1 pr-2">${p.open||'-'}</td>
       <td class="py-1 pr-2">${p.close||'-'}</td>
       <td class="py-1 pr-2">${Math.max(0, parseInt(p.__wait||0,10))} min</td>
@@ -284,11 +302,11 @@ function renderResults(order, startMin, avgSpeed, circular){
             <thead>
               <tr class="text-left text-slate-600">
                 <th class="py-1 pr-2">#</th>
-                <th class="py-1 pr-2">Parada</th>
+                <th class="py-1 pr-2">Parada (Local — Dirección)</th>
                 <th class="py-1 pr-2">Abre</th>
                 <th class="py-1 pr-2">Cierra</th>
                 <th class="py-1 pr-2">Espera</th>
-                <th class="py-1 pr-2">Estadia</th>
+                <th class="py-1 pr-2">Estadía</th>
                 <th class="py-1 pr-2">Llega</th>
                 <th class="py-1 pr-2">Sale</th>
               </tr>
@@ -338,6 +356,7 @@ async function fullFlow(){
 // ====== Eventos ======
 $("links").addEventListener('input', ()=>{ if($("autoRun").checked){ clearTimeout(debounceTimer); debounceTimer=setTimeout(fullFlow, 1200); } });
 $("oneClick").addEventListener('click', fullFlow);
+$("updateBtn").addEventListener('click', ()=>{ setStatus('Actualizando…'); fullFlow(); });
 $("clearBtn").addEventListener('click', ()=>{ $("links").value=''; points=[]; renderInputTable(); $("results").innerHTML='<p class="text-slate-500">Aún sin resultados.</p>'; $("dirLinks").innerHTML=''; setStatus('Esperando entradas…'); });
 
 $("saveNamed").addEventListener('click', onSaveNamed);
@@ -348,14 +367,30 @@ $("deleteNamed").addEventListener('click', onDeleteNamed);
 $("exportNamed").addEventListener('click', onExportNamed);
 $("importNamed").addEventListener('change', (e)=>{ const f=e.target.files[0]; if(f) onImportNamed(f); e.target.value=''; });
 
-// CSV con ventanas
+// Export CSV con columna "local"
 $("exportCsv").addEventListener('click', ()=>{
   if(!points.length){ alert('No hay puntos.'); return; }
-  const header=['orden','nombre','lat','lng','dwell_min','abre','cierra'];
-  const rows=[header].concat(points.map((p,i)=>[i+1,(p.name||p.address||'').replaceAll('"','""'),p.lat,p.lng,Math.max(0,parseInt(p.dwell||0,10)), p.open||'', p.close||'']));
+  const header=['orden','local','direccion','lat','lng','dwell_min','abre','cierra'];
+  const rows=[header].concat(points.map((p,i)=>[
+    i+1,
+    (p.local||'').replaceAll('"','""'),
+    (p.name||p.address||'').replaceAll('"','""'),
+    p.lat, p.lng,
+    Math.max(0,parseInt(p.dwell||0,10)),
+    p.open||'', p.close||''
+  ]));
   const csv = rows.map(r=>r.map(v=>`"${v}"`).join(',')).join('\n');
   const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='rutas_puntos_ventanas.csv'; a.click(); URL.revokeObjectURL(a.href);
+});
+
+// Atajo: Ctrl/Cmd + Enter -> Actualizar
+document.addEventListener('keydown', (e) => {
+  const isMac = navigator.platform.toUpperCase().includes('MAC');
+  if ((isMac ? e.metaKey : e.ctrlKey) && e.key === 'Enter') {
+    e.preventDefault();
+    $("updateBtn").click();
+  }
 });
 
 // Inicial
