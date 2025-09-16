@@ -1,12 +1,12 @@
-// Cache simple para PWA
-const CACHE = 'rutas-timewin-v6';
+const CACHE = 'rutas-timewin-v7';
 const FILES = [
   './',
   './index.html',
   './app.js?v=6',
-  './manifest.webmanifest?v=6',
-  './icons/icon-192.png',
-  './icons/icon-512.png'
+  // Si TENÉS manifest e íconos, dejalos. Si no, quitalos o subí los archivos.
+  // './manifest.webmanifest?v=6',
+  // './icons/icon-192.png',
+  // './icons/icon-512.png'
 ];
 
 self.addEventListener('install', (e) => {
@@ -16,7 +16,9 @@ self.addEventListener('install', (e) => {
 
 self.addEventListener('activate', (e) => {
   e.waitUntil(
-    caches.keys().then(keys => Promise.all(keys.map(k => k !== CACHE ? caches.delete(k) : null)))
+    caches.keys().then(keys => Promise.all(
+      keys.map(k => k !== CACHE ? caches.delete(k) : null)
+    ))
   );
   self.clients.claim();
 });
