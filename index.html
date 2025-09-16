@@ -10,6 +10,34 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <style>.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,'Liberation Mono','Courier New',monospace}</style>
 </head>
+  <script type="module">
+  // SDKs (versiones modernas)
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
+  import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js";
+  import { getFirestore, doc, setDoc, getDocs, collection, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore.js";
+
+  // TODO: reemplazá con tu config (Project settings → Your apps → Web)
+  const firebaseConfig = {
+    apiKey: "TU_API_KEY",
+    authDomain: "TU_DOMINIO.firebaseapp.com",
+    projectId: "TU_PROJECT_ID",
+    storageBucket: "TU_BUCKET.appspot.com",
+    messagingSenderId: "TU_SENDER_ID",
+    appId: "TU_APP_ID"
+  };
+
+  // Inicializar
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
+  // Hacer auth anónima al cargar
+  signInAnonymously(auth).catch(console.error);
+
+  // Exponer helpers globales para que los use app.js
+  window._firebase = { db, auth, onAuthStateChanged, doc, setDoc, getDocs, collection, updateDoc, deleteDoc };
+</script>
+
 <body class="bg-slate-50 text-slate-800">
   <div class="max-w-7xl mx-auto p-4 sm:p-6">
     <!-- HERO FULLSCREEN SOLO LOGO -->
