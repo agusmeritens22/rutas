@@ -1,4 +1,4 @@
-// Columna "Local" + FIX de ventanas: conserva Abre/Cierra/Estadía y muestra en cronograma
+// Columna "Local" + Ventanas horarias + Botón Actualizar + Firebase cloud sync
 const $ = (id) => document.getElementById(id);
 
 let points = []; let startPoint = null; let debounceTimer = null;
@@ -8,7 +8,7 @@ function setStatus(msg){ $("status").textContent = msg; }
 function parseHHMM(s){ if(!s) return null; const m=s.match(/^(\d{1,2}):(\d{2})$/); if(!m) return null; let hh=Math.min(23,Math.max(0,parseInt(m[1],10))); let mm=Math.min(59,Math.max(0,parseInt(m[2],10))); return hh*60+mm; }
 function minutesToHHMM(total){ total=Math.round(total); let hh=Math.floor(total/60)%24; let mm=total%60; return String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0'); }
 
-// ====== Named routes ======
+// ====== Named routes (localStorage) ======
 const LS_KEY='saved_routes_timewin_v3_local';
 const loadSavedRoutes=()=>{ try{return JSON.parse(localStorage.getItem(LS_KEY)||'[]');}catch{return[];} };
 const saveSavedRoutes=(arr)=> localStorage.setItem(LS_KEY, JSON.stringify(arr));
@@ -24,21 +24,18 @@ function applyRouteObject(r){
   renderInputTable(); setStatus('Ruta cargada.');
 }
 function onSaveNamed(){ const name=($("routeName").value||'').trim(); if(!name) return alert('Poné un nombre.');
-  const arr=loadSavedRoutes(); arr.push(captureRouteObject(name)); saveSavedRoutes(arr); refreshSavedSelect(); alert('Ruta guardada.'); }
+  const arr=loadSavedRoutes(); const obj=captureRouteObject(name); arr.push(obj); saveSavedRoutes(arr); refreshSavedSelect(); alert('Ruta guardada (local) ✅'); return obj; }
 function onUpdateNamed(){ const id=$("savedSelect").value; if(!id) return alert('Elegí una ruta.'); const name=($("routeName").value||'').trim();
   const arr=loadSavedRoutes(); const i=arr.findIndex(x=>x.id===id); if(i<0) return alert('No se encontró.');
-  arr[i]=captureRouteObject(name||arr[i].name); arr[i].id=id; arr[i].name=name||arr[i].name; saveSavedRoutes(arr); refreshSavedSelect(); alert('Ruta actualizada.'); }
+  arr[i]=captureRouteObject(name||arr[i].name); arr[i].id=id; arr[i].name=name||arr[i].name; saveSavedRoutes(arr); refreshSavedSelect(); alert('Ruta actualizada (local) ✅'); return arr[i]; }
 function onLoadNamed(){ const id=$("savedSelect").value; if(!id) return alert('Elegí una ruta.'); const arr=loadSavedRoutes(); const r=arr.find(x=>x.id===id); if(!r) return alert('No se encontró.'); applyRouteObject(r); }
 function onRenameNamed(){ const id=$("savedSelect").value; if(!id) return alert('Elegí una ruta.'); const arr=loadSavedRoutes(); const r=arr.find(x=>x.id===id); if(!r) return alert('No se encontró.');
   const newName=prompt('Nuevo nombre:', r.name||''); if(newName&&newName.trim()){ r.name=newName.trim(); saveSavedRoutes(arr); refreshSavedSelect(); } }
-function onDeleteNamed(){ const id=$("savedSelect").value; if(!id) return alert('Elegí una ruta.'); if(!confirm('¿Borrar la ruta seleccionada?')) return; const arr=loadSavedRoutes().filter(r=>r.id!==id); saveSavedRoutes(arr); refreshSavedSelect(); }
-function onExportNamed(){ const arr=loadSavedRoutes(); const blob=new Blob([JSON.stringify(arr,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='rutas_guardadas.json'; a.click(); URL.revokeObjectURL(a.href); }
-function onImportNamed(file){ const rd=new FileReader(); rd.onload=()=>{ try{ const arr=JSON.parse(rd.result); if(!Array.isArray(arr)) throw new Error('Formato inválido'); saveSavedRoutes(arr); refreshSavedSelect(); alert('Rutas importadas.'); }catch(e){ alert('Error al importar: '+e.message); } }; rd.readAsText(file); }
+function onDeleteNamedLocal(){ const id=$("savedSelect").value; if(!id) return alert('Elegí una ruta.'); if(!confirm('¿Borrar la ruta seleccionada (local)?')) return; const arr=loadSavedRoutes().filter(r=>r.id!==id); saveSavedRoutes(arr); refreshSavedSelect(); }
 
 // ====== Parse / geocode ======
 function extractHouseNumber(s){ if(!s) return null; const m=s.match(/(\b\d{1,5}\b)(?!.*\b\d{1,5}\b)/); return m?m[1]:null; }
 function parseNameAndAddress(line) {
-  // Permite "Local | Dirección" o "Local - Dirección"; si no hay separador, devuelve solo address
   const m = line.split('|');
   if (m.length >= 2) return { local: m[0].trim(), address: m.slice(1).join('|').trim() };
   const dash = line.split(' - ');
@@ -47,9 +44,7 @@ function parseNameAndAddress(line) {
 }
 function parseLine(raw){
   const t=(raw||'').trim(); if(!t) return null;
-  // coords
   let m=t.match(/^\s*(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)\s*$/); if(m) return {lat:parseFloat(m[1]), lng:parseFloat(m[2]), source:'coords', address:null, local:''};
-  // url
   if(/^https?:\/\//i.test(t)){
     try{ const u=new URL(t);
       m=t.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/); if(m) return {lat:parseFloat(m[1]), lng:parseFloat(m[2]), source:'@', address:null, local:''};
@@ -61,7 +56,6 @@ function parseLine(raw){
       return {address:t, source:'url-address', local:''};
     }catch(_){}
   }
-  // texto libre: permitir "Local | Dirección"
   const pa = parseNameAndAddress(t);
   return {address: pa.address, source:'text-address', local: pa.local};
 }
@@ -71,7 +65,7 @@ function parseAll(){
   const defOpen = $("defaultOpen").value || '';
   const defClose = $("defaultClose").value || '';
 
-  const prev = points.slice(); // para preservar campos editados
+  const prev = points.slice();
   function findPrevLike(obj){
     const key = (obj.address||obj.name||'').trim().toLowerCase();
     let cand = prev.find(p=> ((p.address||p.name||'').trim().toLowerCase())===key );
@@ -133,8 +127,7 @@ async function geocodeAddress(addr){
   const res=await fetch(url); if(!res.ok) return null; const arr=await res.json(); if(!arr||!arr.length) return null;
   if(desired){ const exact=arr.find(r=> r.address && r.address.house_number && r.address.house_number == desired);
     if(exact) return { lat:parseFloat(exact.lat), lng:parseFloat(exact.lon), name: exact.display_name, precision:'Exacta' }; }
-  if(desired){ const re=new RegExp(`\\b${desired}\\b`); const near=arr.find(r=> re.test(r.display_name||''));
-    if(near) return { lat:parseFloat(near.lat), lng:parseFloat(near.lon), name: near.display_name, precision:'Aprox.' }; }
+  if(desired){ const re=new RegExp(`\\b${desired}\\b`); const near=arr.find(r=> re.test(r.display_name||'')); if(near) return { lat:parseFloat(near.lat), lng:parseFloat(near.lon), name: near.display_name, precision:'Aprox.' }; }
   const r=arr[0]; return { lat:parseFloat(r.lat), lng:parseFloat(r.lon), name:r.display_name, precision:'Aprox.' };
 }
 async function geocodeMissing(){
@@ -231,7 +224,6 @@ function renderInputTable(){
       <td class="py-2 pr-3"><input data-id="${p.id||idx+1}" data-field="close" type="time" value="${p.close||''}" class="p-1 border rounded text-xs" /></td>`;
     tbody.appendChild(tr);
   });
-  // binds
   tbody.querySelectorAll('input').forEach(inp=>{
     inp.addEventListener('change',(e)=>{
       const id=e.target.getAttribute('data-id');
@@ -353,17 +345,36 @@ async function fullFlow(){
   setStatus('Listo ✅');
 }
 
-// ====== Eventos ======
+// ====== Eventos UI ======
 $("links").addEventListener('input', ()=>{ if($("autoRun").checked){ clearTimeout(debounceTimer); debounceTimer=setTimeout(fullFlow, 1200); } });
 $("oneClick").addEventListener('click', fullFlow);
 $("updateBtn").addEventListener('click', ()=>{ setStatus('Actualizando…'); fullFlow(); });
 $("clearBtn").addEventListener('click', ()=>{ $("links").value=''; points=[]; renderInputTable(); $("results").innerHTML='<p class="text-slate-500">Aún sin resultados.</p>'; $("dirLinks").innerHTML=''; setStatus('Esperando entradas…'); });
 
-$("saveNamed").addEventListener('click', onSaveNamed);
-$("updateNamed").addEventListener('click', onUpdateNamed);
+// Guardado local + nube
+$("saveNamed").addEventListener('click', async () => {
+  const name = ($("routeName").value||'').trim();
+  if(!name) return alert('Poné un nombre.');
+  const obj = onSaveNamed(); // local
+  try { await cloudSaveNamed(name, obj.id); } catch(e){ console.error(e); alert("No se pudo guardar en la nube"); }
+});
+
+$("updateNamed").addEventListener('click', async () => {
+  const updated = onUpdateNamed(); // local
+  if(updated){
+    try { await cloudSaveNamed(updated.name, updated.id); } catch(e){ console.error(e); }
+  }
+});
+
 $("loadNamed").addEventListener('click', onLoadNamed);
 $("renameNamed").addEventListener('click', onRenameNamed);
-$("deleteNamed").addEventListener('click', onDeleteNamed);
+
+$("deleteNamed").addEventListener('click', async () => {
+  const id=$("savedSelect").value; if(!id) return alert('Elegí una ruta.');
+  onDeleteNamedLocal(); // local
+  try { await cloudDelete(id); } catch(e){ console.warn("No se pudo borrar en la nube (quizás no existe):", e); }
+});
+
 $("exportNamed").addEventListener('click', onExportNamed);
 $("importNamed").addEventListener('change', (e)=>{ const f=e.target.files[0]; if(f) onImportNamed(f); e.target.value=''; });
 
@@ -393,5 +404,50 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// Inicial
+// ====== Firebase (Cloud) ======
+// Requiere que en index.html hayas inicializado window._firebase con db/auth/etc.
+async function cloudSaveNamed(name, forcedId){
+  const fb = window._firebase;
+  if(!fb){ console.warn("Firebase no inicializado"); return; }
+  const { db, auth, doc, setDoc } = fb;
+  const user = auth.currentUser;
+  if(!user) { alert("Esperando autenticación…"); return; }
+  // Si viene un id (de onSaveNamed/onUpdateNamed) lo usamos; si no, capturamos nuevo
+  const routeObj = forcedId ? { ...captureRouteObject(name), id: forcedId } : captureRouteObject(name);
+  await setDoc(doc(db, "users", user.uid, "routes", routeObj.id), routeObj);
+  setStatus("Ruta guardada en la nube ☁️");
+}
+
+async function cloudList(){
+  const fb = window._firebase; if(!fb) return [];
+  const { db, auth, collection, getDocs } = fb;
+  const user = auth.currentUser; if(!user) return [];
+  const snap = await getDocs(collection(db, "users", user.uid, "routes"));
+  return snap.docs.map(d => d.data());
+}
+
+async function cloudDelete(id){
+  const fb = window._firebase; if(!fb) return;
+  const { db, auth, doc, deleteDoc } = fb;
+  const user = auth.currentUser; if(!user) return;
+  await deleteDoc(doc(db, "users", user.uid, "routes", id));
+  setStatus("Ruta borrada de la nube 🗑️");
+}
+
+// Sincronizar listado nube -> local (cuando abrís el select o si querés, ponelo en un botón)
+$("savedSelect").addEventListener('focus', async () => {
+  try {
+    const list = await cloudList();
+    if(!list.length) return;
+    const locales = loadSavedRoutes();
+    const byId = Object.fromEntries(locales.map(r=>[r.id, r]));
+    list.forEach(r => { byId[r.id] = r; });
+    const merged = Object.values(byId);
+    saveSavedRoutes(merged);
+    refreshSavedSelect();
+    setStatus("Sincronizado con la nube ☁️");
+  } catch(e){ console.error(e); }
+});
+
+// Inicial UI
 refreshSavedSelect();
