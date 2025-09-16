@@ -122,14 +122,48 @@ function parseAll(){
 }
 
 async function geocodeAddress(addr){
-  const desired=extractHouseNumber(addr);
-  const url=`https://nominatim.openstreetmap.org/search?format=json&limit=5&addressdetails=1&accept-language=es&q=${encodeURIComponent(addr)}`;
-  const res=await fetch(url); if(!res.ok) return null; const arr=await res.json(); if(!arr||!arr.length) return null;
-  if(desired){ const exact=arr.find(r=> r.address && r.address.house_number && r.address.house_number == desired);
-    if(exact) return { lat:parseFloat(exact.lat), lng:parseFloat(exact.lon), name: exact.display_name, precision:'Exacta' }; }
-  if(desired){ const re=new RegExp(`\\b${desired}\\b`); const near=arr.find(r=> re.test(r.display_name||'')); if(near) return { lat:parseFloat(near.lat), lng:parseFloat(near.lon), name: near.display_name, precision:'Aprox.' }; }
-  const r=arr[0]; return { lat:parseFloat(r.lat), lng:parseFloat(r.lon), name:r.display_name, precision:'Aprox.' };
+  const cfg = window.GEOCODER || {};
+  if (cfg.provider !== 'opencage' || !cfg.key) {
+    throw new Error('Geocoder no configurado (OpenCage).');
+  }
+
+  const url = `https://api.opencagedata.com/geocode/v1/json?q=${encodeURIComponent(addr)}&key=${cfg.key}&language=es&limit=5&no_annotations=1`;
+
+  const res = await fetch(url);
+  if (!res.ok) {
+    // 402 = quota, 403 = key inválida o restringida, etc.
+    const msg = `Geocoder HTTP ${res.status}`;
+    console.error(msg);
+    throw new Error(msg);
+  }
+
+  const data = await res.json();
+  if (!data || !data.results || !data.results.length) {
+    return null;
+  }
+
+  // Intentar casar número de puerta exacto si viene en la dirección original
+  const desired = extractHouseNumber(addr);
+  let best = data.results[0];
+
+  if (desired) {
+    const exact = data.results.find(r => {
+      const hn = r.components && (r.components.house_number || r.components['house_number']);
+      return hn && String(hn) === String(desired);
+    });
+    if (exact) best = exact;
+  }
+
+  return {
+    lat: best.geometry.lat,
+    lng: best.geometry.lng,
+    name: best.formatted,
+    precision: desired
+      ? ((best.components && String(best.components.house_number) === String(desired)) ? 'Exacta' : 'Aprox.')
+      : 'Aprox.'
+  };
 }
+
 async function geocodeMissing(){
   let c=0;
   for(const p of points){
