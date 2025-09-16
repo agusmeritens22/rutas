@@ -37,6 +37,13 @@
   // Exponer helpers globales para que los use app.js
   window._firebase = { db, auth, onAuthStateChanged, doc, setDoc, getDocs, collection, updateDoc, deleteDoc };
 </script>
+  
+<script>
+  window.GEOCODER = {
+    provider: 'opencage', // 'opencage' | 'mapbox'
+    key: 'a24210fb3d144afc8d35ad8d5e339879'
+  };
+</script>
 
 <body class="bg-slate-50 text-slate-800">
   <div class="max-w-7xl mx-auto p-4 sm:p-6">
