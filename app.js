@@ -502,3 +502,50 @@ $("savedSelect").addEventListener('focus', async () => {
 
 // Inicial UI
 refreshSavedSelect();
+
+async function cloudSyncToLocal(){
+  try {
+    const list = await cloudList();
+    if(!list || !list.length) return;
+    const locales = loadSavedRoutes();
+    const byId = Object.fromEntries(locales.map(r => [r.id, r]));
+    list.forEach(r => { byId[r.id] = r; });
+    const merged = Object.values(byId);
+    saveSavedRoutes(merged);
+    refreshSavedSelect();
+    setStatus("Sincronizado con la nube al iniciar ☁️");
+  } catch(e){
+    console.error("cloudSyncToLocal:", e);
+  }
+}
+
+// Auto-sync al cargar (cuando Auth esté lista)
+(function autoSyncOnLoad(){
+  if (window._firebase && window._firebase.auth && window._firebase.onAuthStateChanged) {
+    window._firebase.onAuthStateChanged(window._firebase.auth, async (user) => {
+      if (user) { await cloudSyncToLocal(); }
+    });
+    return;
+  }
+  let tries = 0;
+  const t = setInterval(() => {
+    if (window._firebase && window._firebase.auth && window._firebase.onAuthStateChanged) {
+      clearInterval(t);
+      window._firebase.onAuthStateChanged(window._firebase.auth, async (user) => {
+        if (user) { await cloudSyncToLocal(); }
+      });
+    }
+    if (++tries > 40) clearInterval(t); // 10s
+  }, 250);
+})();
+
+// Re-sync al volver a la pestaña
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    cloudSyncToLocal();
+  }
+});
+
+// (Dejalo también si ya lo tenías)
+$("savedSelect").addEventListener('focus', cloudSyncToLocal);
+
