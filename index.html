@@ -176,6 +176,54 @@ Carnicería El Toro | Hipólito Yrigoyen 295, B7240 Lobos, BA"></textarea>
 
   <!-- Firebase (colocar TUS credenciales) -->
   <script type="module">
+import {
+  getAuth, signInAnonymously, onAuthStateChanged, setPersistence,
+  browserLocalPersistence, GoogleAuthProvider, signInWithPopup, signInWithRedirect, signOut
+} from "https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js";
+
+// ... tu initializeApp(...) y getFirestore(...)
+
+const provider = new GoogleAuthProvider();
+
+// mantener sesión + login anónimo por defecto (para que funcione sin cuenta)
+await setPersistence(auth, browserLocalPersistence);
+try { await signInAnonymously(auth); } catch (e) { console.error("Auth anónima:", e); }
+
+// Botones UI
+document.getElementById('googleSignIn')?.addEventListener('click', async () => {
+  try {
+    // En móvil, mejor redirect (popup a veces bloqueado)
+    if (/Mobi|Android/i.test(navigator.userAgent)) {
+      await signInWithRedirect(auth, provider);
+    } else {
+      await signInWithPopup(auth, provider);
+    }
+  } catch (e) {
+    alert("No se pudo iniciar sesión con Google");
+    console.error(e);
+  }
+});
+
+document.getElementById('signOut')?.addEventListener('click', async () => {
+  await signOut(auth);
+  // volver a anónimo para que la app siga funcionando
+  await signInAnonymously(auth);
+});
+
+// Mostrar quién está conectado y sincronizar
+onAuthStateChanged(auth, (user) => {
+  const who = document.getElementById('whoami');
+  if (user) {
+    const info = user.isAnonymous ? 'Anónimo' : (user.email || 'Google');
+    who && (who.textContent = `Conectado: ${info} (uid=${user.uid.slice(0,8)}…)`);
+    // forzar sincronización de Firestore -> local cuando cambia el usuario
+    window.cloudSyncToLocal?.();
+  } else {
+    who && (who.textContent = 'Sin sesión');
+  }
+});
+
+    
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
     import { 
       getAuth, signInAnonymously, onAuthStateChanged, setPersistence, browserLocalPersistence 
