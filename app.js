@@ -1,15 +1,16 @@
-// Columna "Local" + Ventanas horarias + Botón Actualizar + Firebase cloud sync + OpenCage geocoder
+// Columna "Local" + Ventanas horarias + Firebase cloud sync + OpenCage geocoder
 const $ = (id) => document.getElementById(id);
 
 let points = []; let startPoint = null; let debounceTimer = null;
 function setStatus(msg){ $("status").textContent = msg; }
 
-// ==== Helpers horarios ====
+// Helpers
 function parseHHMM(s){ if(!s) return null; const m=s.match(/^(\d{1,2}):(\d{2})$/); if(!m) return null; let hh=Math.min(23,Math.max(0,parseInt(m[1],10))); let mm=Math.min(59,Math.max(0,parseInt(m[2],10))); return hh*60+mm; }
 function minutesToHHMM(total){ total=Math.round(total); let hh=Math.floor(total/60)%24; let mm=total%60; return String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0'); }
+const fmtCoord = (v) => (typeof v === 'number' && Number.isFinite(v)) ? v.toFixed(6) : '';
 
-// ====== Named routes (localStorage) ======
-const LS_KEY='saved_routes_timewin_v5_local';
+// LocalStorage
+const LS_KEY='saved_routes_timewin_v6_local';
 const loadSavedRoutes=()=>{ try{return JSON.parse(localStorage.getItem(LS_KEY)||'[]');}catch{return[];} };
 const saveSavedRoutes=(arr)=> localStorage.setItem(LS_KEY, JSON.stringify(arr));
 function refreshSavedSelect(){ const sel=$("savedSelect"); const arr=loadSavedRoutes(); sel.innerHTML=''; arr.forEach(r=>{ const o=document.createElement('option'); o.value=r.id; o.textContent=`${r.name} (${(r.points||[]).length} pts)`; sel.appendChild(o); }); }
@@ -33,7 +34,7 @@ function onRenameNamed(){ const id=$("savedSelect").value; if(!id) return alert(
   const newName=prompt('Nuevo nombre:', r.name||''); if(newName&&newName.trim()){ r.name=newName.trim(); saveSavedRoutes(arr); refreshSavedSelect(); } }
 function onDeleteNamedLocal(){ const id=$("savedSelect").value; if(!id) return alert('Elegí una ruta.'); if(!confirm('¿Borrar la ruta seleccionada (local)?')) return; const arr=loadSavedRoutes().filter(r=>r.id!==id); saveSavedRoutes(arr); refreshSavedSelect(); }
 
-// ====== Parse / geocode ======
+// Parse / geocode
 function extractHouseNumber(s){ if(!s) return null; const m=s.match(/(\b\d{1,5}\b)(?!.*\b\d{1,5}\b)/); return m?m[1]:null; }
 function parseNameAndAddress(line) {
   const m = line.split('|');
@@ -121,7 +122,7 @@ function parseAll(){
   points=out; renderInputTable();
 }
 
-// === OpenCage geocoder ===
+// OpenCage geocoder
 async function geocodeAddress(addr){
   const cfg = window.GEOCODER || {};
   if (cfg.provider !== 'opencage' || !cfg.key) {
@@ -129,17 +130,12 @@ async function geocodeAddress(addr){
   }
   const url = `https://api.opencagedata.com/geocode/v1/json?q=${encodeURIComponent(addr)}&key=${cfg.key}&language=es&limit=5&no_annotations=1`;
   const res = await fetch(url);
-  if (!res.ok) {
-    const msg = `Geocoder HTTP ${res.status}`;
-    console.error(msg);
-    throw new Error(msg);
-  }
+  if (!res.ok) { throw new Error(`Geocoder HTTP ${res.status}`); }
   const data = await res.json();
   if (!data || !data.results || !data.results.length) return null;
 
   const desired = extractHouseNumber(addr);
   let best = data.results[0];
-
   if (desired) {
     const exact = data.results.find(r => {
       const hn = r.components && (r.components.house_number || r.components['house_number']);
@@ -147,7 +143,6 @@ async function geocodeAddress(addr){
     });
     if (exact) best = exact;
   }
-
   return {
     lat: best.geometry.lat,
     lng: best.geometry.lng,
@@ -161,21 +156,21 @@ async function geocodeAddress(addr){
 async function geocodeMissing(){
   let c=0;
   for(const p of points){
-    if(isFinite(p.lat) && isFinite(p.lng)) continue;
+    if(Number.isFinite(p.lat) && Number.isFinite(p.lng)) continue;
     const address=(p.name&&p.name.trim()) || (p.address&&p.address.trim()); if(!address) continue;
     setStatus(`Geocodificando: ${address.slice(0,80)}…`);
-    try{ const g=await geocodeAddress(address);
-      if(g && isFinite(g.lat) && isFinite(g.lng)){
+    try{
+      const g=await geocodeAddress(address);
+      if(g && Number.isFinite(g.lat) && Number.isFinite(g.lng)){
         p.lat=g.lat; p.lng=g.lng; if(!p.name) p.name=g.name; p.precision=g.precision||'Aprox.'; c++; renderInputTable();
       }
     }catch(e){ console.error(e); }
-    await new Promise(r=>setTimeout(r, 500)); // leve pausa
+    await new Promise(r=>setTimeout(r, 500));
   }
-  if(c===0){ setStatus('No se pudo geocodificar (revisá la API key o el proveedor).'); }
-  else { setStatus(`Geocodificación completa (${c} resueltas).`); }
+  setStatus(c===0 ? 'No se pudo geocodificar (revisá la API key o el proveedor).' : `Geocodificación completa (${c} resueltas).`);
 }
 
-// ====== Distancias / ruteo ======
+// Distancias / ruteo
 function haversine(a,b){ if(!a||!b) return Infinity; const R=6371,toRad=d=>d*Math.PI/180;
   const dLat=toRad(b.lat-a.lat), dLng=toRad(b.lng-a.lng), lat1=toRad(a.lat), lat2=toRad(b.lat);
   const h=Math.sin(dLat/2)**2 + Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLng/2)**2; return 2*R*Math.atan2(Math.sqrt(h),Math.sqrt(1-h)); }
@@ -220,9 +215,9 @@ function twoOptDistanceOnly(route, start){ if(route.length<4) return route; let 
 
 function buildDirLinks(order,startPoint,circular=false,chunkTotal=10){
   const pts = [];
-  if (startPoint && isFinite(startPoint.lat) && isFinite(startPoint.lng)) pts.push(startPoint);
-  order.forEach(p => { if (isFinite(p.lat) && isFinite(p.lng)) pts.push(p); });
-  if (circular && startPoint && isFinite(startPoint.lat) && isFinite(startPoint.lng)) pts.push(startPoint);
+  if (startPoint && Number.isFinite(startPoint.lat) && Number.isFinite(startPoint.lng)) pts.push(startPoint);
+  order.forEach(p => { if (Number.isFinite(p.lat) && Number.isFinite(p.lng)) pts.push(p); });
+  if (circular && startPoint && Number.isFinite(startPoint.lat) && Number.isFinite(startPoint.lng)) pts.push(startPoint);
 
   if(pts.length<2) return []; const chunks=[]; let i=0;
   while(i<pts.length-1){
@@ -249,8 +244,8 @@ function renderInputTable(){
       <td class="py-2 pr-3 text-slate-500">${idx+1}</td>
       <td class="py-2 pr-3"><input data-id="${p.id||idx+1}" data-field="local" type="text" value="${(p.local||'').replace(/"/g,'&quot;')}" class="w-48 p-1 border rounded text-xs" placeholder="Nombre del local" /></td>
       <td class="py-2 pr-3">${name}</td>
-      <td class="py-2 pr-3">${isFinite(p.lat)? p.lat.toFixed(6): ''}</td>
-      <td class="py-2 pr-3">${isFinite(p.lng)? p.lng.toFixed(6): ''}</td>
+      <td class="py-2 pr-3">${fmtCoord(p.lat)}</td>
+      <td class="py-2 pr-3">${fmtCoord(p.lng)}</td>
       <td class="py-2 pr-3 ${prec==='Exacta'?'text-emerald-600':'text-amber-600'}">${prec}</td>
       <td class="py-2 pr-3"><input data-id="${p.id||idx+1}" data-field="dwell" type="number" min="0" step="1" value="${dwell}" class="w-20 p-1 border rounded text-xs" /></td>
       <td class="py-2 pr-3"><input data-id="${p.id||idx+1}" data-field="open" type="time" value="${p.open||''}" class="p-1 border rounded text-xs" /></td>
@@ -347,7 +342,7 @@ function fullParse(){ parseAll(); renderInputTable(); }
 
 async function fullFlow(){
   setStatus('Leyendo…'); fullParse();
-  const needGeo = points.some(p=> !(isFinite(p.lat) && isFinite(p.lng)));
+  const needGeo = points.some(p=> !(Number.isFinite(p.lat) && Number.isFinite(p.lng)));
   if(needGeo){ await geocodeMissing(); }
   if(points.length<2){ setStatus('Necesitás al menos 2 puntos.'); return; }
   setStatus('Optimizando…');
@@ -365,8 +360,8 @@ async function fullFlow(){
   const chunks=buildDirLinks(route, (startPoint||route[0]), circular, 10);
   const wrap=$("dirLinks"); wrap.innerHTML='';
   chunks.forEach((ch,idx)=>{
-    const fromTxt = (isFinite(ch.from?.lat)&&isFinite(ch.from?.lng)) ? `${ch.from.lat.toFixed(4)},${ch.from.lng.toFixed(4)}` : '-';
-    const toTxt   = (isFinite(ch.to?.lat)&&isFinite(ch.to?.lng)) ? `${ch.to.lat.toFixed(4)},${ch.to.lng.toFixed(4)}` : '-';
+    const fromTxt = (Number.isFinite(ch.from?.lat)&&Number.isFinite(ch.from?.lng)) ? `${ch.from.lat.toFixed(4)},${ch.from.lng.toFixed(4)}` : '-';
+    const toTxt   = (Number.isFinite(ch.to?.lat)&&Number.isFinite(ch.to?.lng)) ? `${ch.to.lat.toFixed(4)},${ch.to.lng.toFixed(4)}` : '-';
     const div=document.createElement('div'); div.className='p-2 border rounded-lg flex items-center justify-between gap-3';
     div.innerHTML=`
       <div>
@@ -380,7 +375,7 @@ async function fullFlow(){
   setStatus('Listo ✅');
 }
 
-// ====== Eventos UI ======
+// UI events
 $("links").addEventListener('input', ()=>{ if($("autoRun").checked){ clearTimeout(debounceTimer); debounceTimer=setTimeout(fullFlow, 1200); } });
 $("oneClick").addEventListener('click', fullFlow);
 $("updateBtn").addEventListener('click', ()=>{ setStatus('Actualizando…'); fullFlow(); });
@@ -418,8 +413,8 @@ $("exportCsv").addEventListener('click', ()=>{
     i+1,
     (p.local||'').replaceAll('"','""'),
     (p.name||p.address||'').replaceAll('"','""'),
-    isFinite(p.lat)?p.lat:'',
-    isFinite(p.lng)?p.lng:'',
+    Number.isFinite(p.lat)?p.lat:'',
+    Number.isFinite(p.lng)?p.lng:'',
     Math.max(0,parseInt(p.dwell||0,10)),
     p.open||'', p.close||''
   ]));
@@ -437,7 +432,7 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// ====== Firebase (Cloud) ======
+// Firebase helpers
 async function cloudSaveNamed(name, forcedId){
   const fb = window._firebase;
   if(!fb){ console.warn("Firebase no inicializado"); return; }
@@ -462,8 +457,6 @@ async function cloudDelete(id){
   await deleteDoc(doc(db, "users", user.uid, "routes", id));
   setStatus("Ruta borrada de la nube 🗑️");
 }
-
-// Sync nube → local
 async function cloudSyncToLocal(){
   try {
     const list = await cloudList();
@@ -479,8 +472,6 @@ async function cloudSyncToLocal(){
     console.error("cloudSyncToLocal:", e);
   }
 }
-
-// Auto-sync al cargar cuando Auth esté lista
 (function autoSyncOnLoad(){
   if (window._firebase && window._firebase.auth && window._firebase.onAuthStateChanged) {
     window._firebase.onAuthStateChanged(window._firebase.auth, async (user) => {
@@ -496,19 +487,13 @@ async function cloudSyncToLocal(){
         if (user) { await cloudSyncToLocal(); }
       });
     }
-    if (++tries > 40) clearInterval(t); // 10s
+    if (++tries > 40) clearInterval(t);
   }, 250);
 })();
-
-// Re-sync al volver a la pestaña
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') {
-    cloudSyncToLocal();
-  }
+  if (document.visibilityState === 'visible') cloudSyncToLocal();
 });
-
-// Botón “Sincronizar ahora”
 $("syncNow")?.addEventListener('click', cloudSyncToLocal);
 
-// Inicial UI
+// Inicial
 refreshSavedSelect();
