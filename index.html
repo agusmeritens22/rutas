@@ -3,252 +3,115 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Mi Planificador de Rutas</title>
-  <link rel="manifest" href="manifest.webmanifest?v=6">
-  <meta name="theme-color" content="#0284c7">
-  <link rel="icon" href="icons/icon-192.png">
+  <title>Planificador de Rutas</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <style>.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,'Liberation Mono','Courier New',monospace}</style>
+  <link rel="manifest" href="manifest.webmanifest?v=9">
+  <meta name="theme-color" content="#0284c7">
 </head>
 <body class="bg-slate-50 text-slate-800">
-  <!-- HERO fullscreen solo logo (opcional) -->
 
+  <header class="p-4 bg-sky-700 text-white text-center">
+    <h1 class="text-xl font-bold">Planificador de Rutas</h1>
+  </header>
 
-  <div id="app" class="max-w-7xl mx-auto p-4 sm:p-6">
-    <header class="mb-6 text-center">
-      <h1 class="text-2xl sm:text-3xl font-bold">Mi Planificador de Rutas</h1>
-      <p class="text-sm text-slate-600 mt-1">Armá y optimizá recorridos con ventanas horarias y nombres de locales.</p>
-    </header>
-
-    <section class="grid grid-cols-1 xl:grid-cols-3 gap-4 xl:gap-6">
-      <div class="xl:col-span-2 space-y-6">
-        <div class="bg-white rounded-2xl shadow p-4 sm:p-5">
-          <label for="links" class="block text-sm font-medium mb-2">Direcciones o links (uno por línea):</label>
-          <textarea id="links" class="w-full h-44 p-3 border rounded-xl mono text-sm focus:outline-none focus:ring-2 focus:ring-sky-600" placeholder="Podés pegar 'Local | Dirección', por ej.:
-La Esquina Market | Buenos Aires 787, B7240 Lobos, BA
-Carnicería El Toro | Hipólito Yrigoyen 295, B7240 Lobos, BA"></textarea>
-
-          <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
-            <label class="text-sm flex items-center gap-2">
-              <input id="autoRun" type="checkbox" class="w-4 h-4 rounded" checked>
-              Auto-geocodificar y optimizar
-            </label>
-            <div class="flex items-center gap-2">
-              <label class="text-sm" for="avgSpeed">Velocidad media (km/h):</label>
-              <input id="avgSpeed" type="number" min="1" step="1" value="40" class="w-24 p-2 border rounded-lg text-sm" />
-            </div>
-            <div class="flex items-center gap-2">
-              <label class="text-sm" for="defaultDwell">Estadía por parada (min.):</label>
-              <input id="defaultDwell" type="number" min="0" step="1" value="10" class="w-24 p-2 border rounded-lg text-sm" />
-            </div>
-            <div class="flex items-center gap-2">
-              <label class="text-sm" for="startTime">Hora de inicio:</label>
-              <input id="startTime" type="time" class="p-2 border rounded-lg text-sm" value="08:00" />
-            </div>
-            <div class="flex items-center gap-2">
-              <label class="text-sm" for="defaultOpen">Apertura (por defecto):</label>
-              <input id="defaultOpen" type="time" class="p-2 border rounded-lg text-sm" placeholder="08:00" />
-            </div>
-            <div class="flex items-center gap-2">
-              <label class="text-sm" for="defaultClose">Cierre (por defecto):</label>
-              <input id="defaultClose" type="time" class="p-2 border rounded-lg text-sm" placeholder="18:00" />
-            </div>
-            <label class="text-sm flex items-center gap-2">
-              <input id="useGeo" type="checkbox" class="w-4 h-4 rounded">
-              Usar mi ubicación como inicio
-            </label>
-            <label class="text-sm flex items-center gap-2">
-              <input id="circular" type="checkbox" class="w-4 h-4 rounded">
-              Ruta circular
-            </label>
-            <label class="text-sm flex items-center gap-2">
-              <input id="enforceWindows" type="checkbox" class="w-4 h-4 rounded" checked>
-              Respetar ventanas horarias
-            </label>
-          </div>
-
-          <div class="mt-4 flex flex-wrap gap-3">
-            <button id="oneClick" class="px-4 py-2 rounded-xl bg-sky-700 text-white shadow hover:bg-sky-800">Pegar y Optimizar</button>
-            <button id="updateBtn" class="px-4 py-2 rounded-xl bg-amber-500 text-white hover:bg-amber-600">Actualizar</button>
-            <button id="clearBtn" class="px-4 py-2 rounded-xl bg-slate-200 text-slate-800 hover:bg-slate-300">Limpiar</button>
-          </div>
-        </div>
-
-        <div id="inputTableWrap" class="bg-white rounded-2xl shadow p-4 sm:p-5 hidden">
-          <h2 class="text-lg font-semibold mb-3">Puntos detectados</h2>
-          <div class="overflow-x-auto">
-            <table class="min-w-full text-xs md:text-sm">
-              <thead>
-                <tr class="text-left text-slate-600">
-                  <th class="py-2 pr-3">#</th>
-                  <th class="py-2 pr-3">Local</th>
-                  <th class="py-2 pr-3">Dirección</th>
-                  <th class="py-2 pr-3">Lat</th>
-                  <th class="py-2 pr-3">Lng</th>
-                  <th class="py-2 pr-3">Precisión</th>
-                  <th class="py-2 pr-3">Estadía</th>
-                  <th class="py-2 pr-3">Abre</th>
-                  <th class="py-2 pr-3">Cierra</th>
-                </tr>
-              </thead>
-              <tbody id="inputTable"></tbody>
-            </table>
-          </div>
-          <div class="mt-3 text-xs text-slate-500">
-            Podés editar <strong>Local</strong>, <strong>Abre/Cierra</strong> y <strong>Estadía</strong>. El cronograma usa estos valores.
-          </div>
-        </div>
-      </div>
-
-      <aside class="xl:col-span-1 space-y-6">
-        <div class="bg-white rounded-2xl shadow p-4 sm:p-5">
-          <h3 class="font-semibold mb-2">Estado</h3>
-          <div id="status" class="text-xs text-slate-500">Esperando entradas…</div>
-
-          <h3 class="font-semibold mt-4 mb-2">Resultados</h3>
-          <div id="results" class="text-sm space-y-2"><p class="text-slate-500">Aún sin resultados.</p></div>
-          <div class="mt-4 flex flex-col gap-2">
-            <button id="copyOrder" class="px-3 py-2 rounded-xl bg-slate-200 text-slate-800 hover:bg-slate-300">Copiar orden</button>
-            <button id="exportCsv" class="px-3 py-2 rounded-xl bg-sky-700 text-white hover:bg-sky-800">Exportar CSV</button>
-          </div>
-        </div>
-
-        <div class="bg-white rounded-2xl shadow p-4 sm:p-5">
-          <h3 class="font-semibold mb-2">Rutas guardadas</h3>
-          <div class="grid grid-cols-1 gap-2">
-            <input id="routeName" type="text" class="p-2 border rounded-lg text-sm" placeholder="Nombre de la ruta" />
-            <div class="flex flex-wrap gap-2">
-              <button id="saveNamed" class="px-3 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">Guardar con nombre</button>
-              <button id="updateNamed" class="px-3 py-2 rounded-lg bg-emerald-100 text-emerald-900 hover:bg-emerald-200">Actualizar</button>
-              <button id="syncNow" class="px-3 py-2 rounded-lg bg-sky-100 text-sky-900 hover:bg-sky-200">Sincronizar ahora</button>
-            </div>
-            <div class="flex items-center gap-2 mt-2">
-              <select id="savedSelect" class="flex-1 p-2 border rounded-lg text-sm"></select>
-            </div>
-            <div class="flex flex-wrap gap-2 mt-1">
-              <button id="loadNamed" class="px-3 py-2 rounded-lg bg-slate-800 text-white hover:bg-slate-900">Cargar</button>
-              <button id="renameNamed" class="px-3 py-2 rounded-lg bg-slate-200 text-slate-900 hover:bg-slate-300">Renombrar</button>
-              <button id="deleteNamed" class="px-3 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700">Borrar</button>
-              <button id="exportNamed" class="px-3 py-2 rounded-lg bg-sky-50 text-sky-900 hover:bg-sky-100">Exportar JSON</button>
-              <label class="px-3 py-2 rounded-lg bg-sky-50 text-sky-900 hover:bg-sky-100 cursor-pointer">
-                Importar JSON
-                <input id="importNamed" type="file" accept="application/json" class="hidden" />
-              </label>
-            </div>
-          </div>
-        </div>
-
-        <div class="bg-white rounded-2xl shadow p-4 sm:p-5">
-          <h3 class="font-semibold mb-2">Enlaces de navegación</h3>
-          <div id="dirLinks" class="text-sm space-y-2"><p class="text-slate-500">Se generan links a Google Maps por tramos.</p></div>
-        </div>
-      </aside>
-    </section>
+  <!-- 🔒 Gate de autenticación -->
+  <style>
+    #authGate {
+      position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+      background: rgba(0,0,0,0.65); z-index: 9999; backdrop-filter: blur(2px);
+    }
+  </style>
+  <div id="authGate">
+    <div class="bg-white rounded-xl shadow-xl p-6 w-[90%] max-w-sm text-center">
+      <h2 class="text-lg font-semibold mb-2">Iniciar sesión</h2>
+      <p class="text-sm text-slate-600 mb-4">Debes iniciar sesión con Google para usar la app.</p>
+      <button id="googleSignIn" class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 w-full">
+        Entrar con Google
+      </button>
+      <p id="authError" class="text-xs text-red-600 mt-3 hidden"></p>
+    </div>
   </div>
 
-<div class="mt-3 flex gap-2">
-  <button id="googleSignIn" class="px-3 py-2 rounded-lg bg-red-600 text-white">Entrar con Google</button>
-  <button id="signOut" class="px-3 py-2 rounded-lg bg-slate-200">Salir</button>
-</div>
-<div id="whoami" class="text-xs text-slate-500 mt-1"></div>
+  <!-- Contenido principal de la app -->
+  <div id="app" class="max-w-5xl mx-auto p-4">
+    <textarea id="links" class="w-full h-40 border p-2 rounded-lg" placeholder="Direcciones o locales..."></textarea>
+    <div class="mt-4 flex gap-2">
+      <button id="oneClick" class="px-4 py-2 bg-sky-700 text-white rounded-lg">Optimizar</button>
+      <button id="clearBtn" class="px-4 py-2 bg-slate-200 rounded-lg">Limpiar</button>
+    </div>
+    <div id="status" class="mt-4 text-sm text-slate-600">Esperando entradas…</div>
+    <div id="results" class="mt-4 text-sm text-slate-800"></div>
+    <div id="dirLinks" class="mt-4 text-sm text-slate-800"></div>
+  </div>
 
-  
-  <script src="app.js?v=6"></script>
+  <script src="app.js?v=9"></script>
 
-  <!-- OpenCage config -->
-  <script>
-    window.GEOCODER = {
-      provider: 'opencage',
-      key: 'a24210fb3d144afc8d35ad8d5e339879'
-    };
-  </script>
-
-  <!-- Firebase (colocar TUS credenciales) -->
+  <!-- 🔑 Firebase + login obligatorio -->
   <script type="module">
-import {
-  getAuth, signInAnonymously, onAuthStateChanged, setPersistence, browserLocalPersistence,
-  GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut
-} from "https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js";
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
+    import {
+      getAuth, onAuthStateChanged, setPersistence, browserLocalPersistence,
+      GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult
+    } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js";
+    import {
+      getFirestore, doc, setDoc, getDocs, collection, updateDoc, deleteDoc
+    } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore.js";
 
-// ... ya tenés initializeApp(firebaseConfig) y const auth = getAuth(app);
+    const firebaseConfig = {
+      apiKey: "TU_API_KEY",
+      authDomain: "TU_DOMINIO.firebaseapp.com",
+      projectId: "TU_PROJECT_ID",
+      storageBucket: "TU_BUCKET.appspot.com",
+      messagingSenderId: "TU_SENDER_ID",
+      appId: "TU_APP_ID"
+    };
 
-// Mantener sesión y arrancar anónimo para que la app funcione sin login
-await setPersistence(auth, browserLocalPersistence);
-try {
-  await signInAnonymously(auth);
-} catch (e) {
-  console.error("Auth anónima:", e);
-}
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db   = getFirestore(app);
+    window._firebase = { db, auth, onAuthStateChanged, doc, setDoc, getDocs, collection, updateDoc, deleteDoc };
 
-// Proveedor Google
-const provider = new GoogleAuthProvider();
-// Sugerencias de UX (opcional)
-provider.setCustomParameters({ prompt: 'select_account' });
+    const gate   = document.getElementById('authGate');
+    const btn    = document.getElementById('googleSignIn');
+    const errBox = document.getElementById('authError');
 
-// --- Manejo de resultado de REDIRECT (necesario en móvil) ---
-try {
-  const redirectResult = await getRedirectResult(auth);
-  if (redirectResult?.user) {
-    console.log("Google redirect OK:", redirectResult.user.uid);
-  }
-} catch (e) {
-  console.error("Error en getRedirectResult:", e.code, e.message);
-  alert("No se pudo completar el inicio con Google (redirect).");
-}
+    await setPersistence(auth, browserLocalPersistence);
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
 
-// Botón Entrar con Google
-document.getElementById('googleSignIn')?.addEventListener('click', async () => {
-  try {
-    const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
-    if (isMobile) {
-      await signInWithRedirect(auth, provider);     // móvil: redirect
-    } else {
-      await signInWithPopup(auth, provider);        // desktop: popup
-    }
-  } catch (e) {
-    console.error("Google sign-in error:", e.code, e.message);
-    if (e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user') {
-      // Plan B si el popup se bloquea
-      try { await signInWithRedirect(auth, provider); } catch (e2) {
-        console.error("Fallback redirect error:", e2.code, e2.message);
-        alert("No se pudo iniciar sesión con Google.");
+    function showGate(msg=''){ gate.classList.remove('hidden'); if(msg){errBox.textContent=msg; errBox.classList.remove('hidden');} }
+    function hideGate(){ gate.classList.add('hidden'); errBox.classList.add('hidden'); errBox.textContent=''; }
+
+    try {
+      const rr = await getRedirectResult(auth);
+      if(rr?.user){ console.log('Google redirect OK:', rr.user.uid); }
+    } catch(e){ console.error('Redirect error:', e); showGate('Error en login con Google.'); }
+
+    onAuthStateChanged(auth, (user)=>{
+      if(user && !user.isAnonymous){
+        console.log("Logueado:", user.email);
+        hideGate();
+        window.cloudSyncToLocal?.();
+      } else {
+        showGate();
       }
-    } else if (e.code === 'auth/unauthorized-domain') {
-      alert("Dominio no autorizado en Firebase Auth. Agregá 'agusmeritens22.github.io' en Authentication → Settings → Authorized domains.");
-    } else {
-      alert("No se pudo iniciar sesión con Google.");
-    }
-  }
-});
+    });
 
-// Botón Salir
-document.getElementById('signOut')?.addEventListener('click', async () => {
-  try {
-    await signOut(auth);
-    await signInAnonymously(auth); // volver a anónimo para que la app siga usable
-  } catch (e) {
-    console.error("SignOut error:", e);
-  }
-});
-
-// Mostrar quién está conectado y forzar sync nube→local cuando cambia el usuario
-onAuthStateChanged(auth, (user) => {
-  const who = document.getElementById('whoami');
-  if (user) {
-    const info = user.isAnonymous ? 'Anónimo' : (user.email || 'Google');
-    who && (who.textContent = `Conectado: ${info} (uid=${user.uid.slice(0,8)}…)`);
-    // sincronizar rutas del nuevo UID
-    window.cloudSyncToLocal?.();
-  } else {
-    who && (who.textContent = 'Sin sesión');
-  }
-});
-
+    btn?.addEventListener('click', async ()=>{
+      try{
+        const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+        if(isMobile){ await signInWithRedirect(auth, provider); }
+        else { await signInWithPopup(auth, provider); }
+      }catch(e){
+        console.error("Google sign-in error:", e);
+        showGate("No se pudo iniciar sesión con Google.");
+      }
+    });
   </script>
 
   <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js'); });
+    if('serviceWorker' in navigator){
+      window.addEventListener('load', ()=>{ navigator.serviceWorker.register('./sw.js'); });
     }
   </script>
 </body>
