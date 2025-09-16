@@ -460,6 +460,23 @@ async function cloudList(){
   return snap.docs.map(d => d.data());
 }
 
+async function cloudSyncToLocal(){
+  try {
+    const list = await cloudList();        // lee todas tus rutas en Firestore
+    if(!list || !list.length) return;      // si no hay, nada que hacer
+    const locales = loadSavedRoutes();     // las que tenés en localStorage
+    const byId = Object.fromEntries(locales.map(r => [r.id, r]));
+    list.forEach(r => { byId[r.id] = r; }); // mergea por id (nube pisa local)
+    const merged = Object.values(byId);
+    saveSavedRoutes(merged);
+    refreshSavedSelect();
+    setStatus("Sincronizado con la nube al iniciar ☁️");
+  } catch(e){
+    console.error("cloudSyncToLocal:", e);
+  }
+}
+
+
 async function cloudDelete(id){
   const fb = window._firebase; if(!fb) return;
   const { db, auth, doc, deleteDoc } = fb;
