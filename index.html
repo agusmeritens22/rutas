@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Planificador de Rutas</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="manifest" href="manifest.webmanifest?v=9">
+  <link rel="manifest" href="manifest.webmanifest?v=10">
   <meta name="theme-color" content="#0284c7">
 </head>
 <body class="bg-slate-50 text-slate-800">
@@ -17,12 +17,14 @@
   <!-- 🔒 Gate de autenticación -->
   <style>
     #authGate {
-      position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
-      background: rgba(0,0,0,0.65); z-index: 9999; backdrop-filter: blur(2px);
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.65);
+      z-index: 9999;
+      backdrop-filter: blur(2px);
     }
   </style>
-  <div id="authGate">
-    <div class="bg-white rounded-xl shadow-xl p-6 w-[90%] max-w-sm text-center">
+  <div id="authGate" class="flex">
+    <div class="bg-white rounded-xl shadow-xl p-6 w-[90%] max-w-sm text-center m-auto">
       <h2 class="text-lg font-semibold mb-2">Iniciar sesión</h2>
       <p class="text-sm text-slate-600 mb-4">Debes iniciar sesión con Google para usar la app.</p>
       <button id="googleSignIn" class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 w-full">
@@ -44,7 +46,7 @@
     <div id="dirLinks" class="mt-4 text-sm text-slate-800"></div>
   </div>
 
-  <script src="app.js?v=9"></script>
+  <script src="app.js?v=10"></script>
 
   <!-- 🔑 Firebase + login obligatorio -->
   <script type="module">
@@ -58,13 +60,13 @@
     } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore.js";
 
     const firebaseConfig = {
-  apiKey: "AIzaSyBMo1tBOmXVhY6QwgWbzvfAndltp9k4NZk",
-  authDomain: "rutas-da064.firebaseapp.com",
-  projectId: "rutas-da064",
-  storageBucket: "rutas-da064.firebasestorage.app",
-  messagingSenderId: "126930065003",
-  appId: "1:126930065003:web:1a40af65ab7f6b9afe832e"
-};
+      apiKey: "TU_API_KEY",
+      authDomain: "TU_DOMINIO.firebaseapp.com",
+      projectId: "TU_PROJECT_ID",
+      storageBucket: "TU_BUCKET.appspot.com",
+      messagingSenderId: "TU_SENDER_ID",
+      appId: "TU_APP_ID"
+    };
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
@@ -79,14 +81,25 @@
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
 
-    function showGate(msg=''){ gate.classList.remove('hidden'); if(msg){errBox.textContent=msg; errBox.classList.remove('hidden');} }
-    function hideGate(){ gate.classList.add('hidden'); errBox.classList.add('hidden'); errBox.textContent=''; }
+    // 🔧 funciones corregidas
+    function showGate(msg=''){
+      gate.style.display = 'flex';   // fuerza visibilidad
+      gate.classList.remove('hidden');
+      if (msg) { errBox.textContent = msg; errBox.classList.remove('hidden'); }
+    }
+    function hideGate(){
+      gate.style.display = 'none';   // fuerza ocultar
+      gate.classList.add('hidden');
+      errBox.classList.add('hidden'); errBox.textContent = '';
+    }
 
+    // Procesar redirect (móvil)
     try {
       const rr = await getRedirectResult(auth);
       if(rr?.user){ console.log('Google redirect OK:', rr.user.uid); }
     } catch(e){ console.error('Redirect error:', e); showGate('Error en login con Google.'); }
 
+    // Forzar login al cargar
     onAuthStateChanged(auth, (user)=>{
       if(user && !user.isAnonymous){
         console.log("Logueado:", user.email);
@@ -97,6 +110,7 @@
       }
     });
 
+    // Click en botón
     btn?.addEventListener('click', async ()=>{
       try{
         const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
