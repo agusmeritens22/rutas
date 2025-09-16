@@ -375,6 +375,45 @@ async function fullFlow(){
   setStatus('Listo ✅');
 }
 
+// ====== Exportar / Importar rutas (JSON) ======
+function onExportNamed() {
+  const arr = loadSavedRoutes();                     // todas las rutas locales
+  const json = JSON.stringify(arr, null, 2);
+  const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'rutas_guardadas.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  setStatus('Exportado JSON ✅');
+}
+
+function onImportNamed(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result || '[]');
+      // Validación simple
+      if (!Array.isArray(data)) throw new Error('El JSON debe ser un array');
+      const actuales = loadSavedRoutes();
+      const byId = Object.fromEntries(actuales.map(r => [r.id, r]));
+      data.forEach(r => {
+        if (r && r.id && r.name) byId[r.id] = r;     // merge por id (import pisa local)
+      });
+      const merged = Object.values(byId);
+      saveSavedRoutes(merged);
+      refreshSavedSelect();
+      setStatus(`Importado ${merged.length} rutas ✅`);
+      alert('Importación completa ✅');
+    } catch (e) {
+      console.error(e);
+      alert('No se pudo importar: JSON inválido');
+    }
+  };
+  reader.readAsText(file);
+}
+
+
 // UI events
 $("links").addEventListener('input', ()=>{ if($("autoRun").checked){ clearTimeout(debounceTimer); debounceTimer=setTimeout(fullFlow, 1200); } });
 $("oneClick").addEventListener('click', fullFlow);
