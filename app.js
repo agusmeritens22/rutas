@@ -1,4 +1,4 @@
-// Columna "Local" + Ventanas horarias + Botón Actualizar + Firebase cloud sync
+// Columna "Local" + Ventanas horarias + Botón Actualizar + Firebase cloud sync + OpenCage geocoder
 const $ = (id) => document.getElementById(id);
 
 let points = []; let startPoint = null; let debounceTimer = null;
@@ -9,7 +9,7 @@ function parseHHMM(s){ if(!s) return null; const m=s.match(/^(\d{1,2}):(\d{2})$/
 function minutesToHHMM(total){ total=Math.round(total); let hh=Math.floor(total/60)%24; let mm=total%60; return String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0'); }
 
 // ====== Named routes (localStorage) ======
-const LS_KEY='saved_routes_timewin_v3_local';
+const LS_KEY='saved_routes_timewin_v5_local';
 const loadSavedRoutes=()=>{ try{return JSON.parse(localStorage.getItem(LS_KEY)||'[]');}catch{return[];} };
 const saveSavedRoutes=(arr)=> localStorage.setItem(LS_KEY, JSON.stringify(arr));
 function refreshSavedSelect(){ const sel=$("savedSelect"); const arr=loadSavedRoutes(); sel.innerHTML=''; arr.forEach(r=>{ const o=document.createElement('option'); o.value=r.id; o.textContent=`${r.name} (${(r.points||[]).length} pts)`; sel.appendChild(o); }); }
@@ -121,28 +121,22 @@ function parseAll(){
   points=out; renderInputTable();
 }
 
+// === OpenCage geocoder ===
 async function geocodeAddress(addr){
   const cfg = window.GEOCODER || {};
   if (cfg.provider !== 'opencage' || !cfg.key) {
     throw new Error('Geocoder no configurado (OpenCage).');
   }
-
   const url = `https://api.opencagedata.com/geocode/v1/json?q=${encodeURIComponent(addr)}&key=${cfg.key}&language=es&limit=5&no_annotations=1`;
-
   const res = await fetch(url);
   if (!res.ok) {
-    // 402 = quota, 403 = key inválida o restringida, etc.
     const msg = `Geocoder HTTP ${res.status}`;
     console.error(msg);
     throw new Error(msg);
   }
-
   const data = await res.json();
-  if (!data || !data.results || !data.results.length) {
-    return null;
-  }
+  if (!data || !data.results || !data.results.length) return null;
 
-  // Intentar casar número de puerta exacto si viene en la dirección original
   const desired = extractHouseNumber(addr);
   let best = data.results[0];
 
@@ -167,17 +161,18 @@ async function geocodeAddress(addr){
 async function geocodeMissing(){
   let c=0;
   for(const p of points){
-    if(typeof p.lat==='number' && typeof p.lng==='number') continue;
+    if(isFinite(p.lat) && isFinite(p.lng)) continue;
     const address=(p.name&&p.name.trim()) || (p.address&&p.address.trim()); if(!address) continue;
     setStatus(`Geocodificando: ${address.slice(0,80)}…`);
     try{ const g=await geocodeAddress(address);
-      if(g && typeof g.lat==='number' && typeof g.lng==='number'){
+      if(g && isFinite(g.lat) && isFinite(g.lng)){
         p.lat=g.lat; p.lng=g.lng; if(!p.name) p.name=g.name; p.precision=g.precision||'Aprox.'; c++; renderInputTable();
       }
     }catch(e){ console.error(e); }
-    await new Promise(r=>setTimeout(r, 1000));
+    await new Promise(r=>setTimeout(r, 500)); // leve pausa
   }
-  setStatus(`Geocodificación completa (${c} resueltas).`);
+  if(c===0){ setStatus('No se pudo geocodificar (revisá la API key o el proveedor).'); }
+  else { setStatus(`Geocodificación completa (${c} resueltas).`); }
 }
 
 // ====== Distancias / ruteo ======
@@ -224,7 +219,11 @@ function twoOptDistanceOnly(route, start){ if(route.length<4) return route; let 
     if(dist(nr)+1e-9<dist(route)){ route=nr; improved=true; } } } } return route; }
 
 function buildDirLinks(order,startPoint,circular=false,chunkTotal=10){
-  const pts=[]; if(startPoint) pts.push(startPoint); order.forEach(p=>pts.push(p)); if(circular&&startPoint) pts.push(startPoint);
+  const pts = [];
+  if (startPoint && isFinite(startPoint.lat) && isFinite(startPoint.lng)) pts.push(startPoint);
+  order.forEach(p => { if (isFinite(p.lat) && isFinite(p.lng)) pts.push(p); });
+  if (circular && startPoint && isFinite(startPoint.lat) && isFinite(startPoint.lng)) pts.push(startPoint);
+
   if(pts.length<2) return []; const chunks=[]; let i=0;
   while(i<pts.length-1){
     const slice=pts.slice(i,Math.min(i+chunkTotal,pts.length)); if(slice.length<2) break;
@@ -250,8 +249,8 @@ function renderInputTable(){
       <td class="py-2 pr-3 text-slate-500">${idx+1}</td>
       <td class="py-2 pr-3"><input data-id="${p.id||idx+1}" data-field="local" type="text" value="${(p.local||'').replace(/"/g,'&quot;')}" class="w-48 p-1 border rounded text-xs" placeholder="Nombre del local" /></td>
       <td class="py-2 pr-3">${name}</td>
-      <td class="py-2 pr-3">${typeof p.lat==='number'? p.lat.toFixed(6): ''}</td>
-      <td class="py-2 pr-3">${typeof p.lng==='number'? p.lng.toFixed(6): ''}</td>
+      <td class="py-2 pr-3">${isFinite(p.lat)? p.lat.toFixed(6): ''}</td>
+      <td class="py-2 pr-3">${isFinite(p.lng)? p.lng.toFixed(6): ''}</td>
       <td class="py-2 pr-3 ${prec==='Exacta'?'text-emerald-600':'text-amber-600'}">${prec}</td>
       <td class="py-2 pr-3"><input data-id="${p.id||idx+1}" data-field="dwell" type="number" min="0" step="1" value="${dwell}" class="w-20 p-1 border rounded text-xs" /></td>
       <td class="py-2 pr-3"><input data-id="${p.id||idx+1}" data-field="open" type="time" value="${p.open||''}" class="p-1 border rounded text-xs" /></td>
@@ -348,7 +347,7 @@ function fullParse(){ parseAll(); renderInputTable(); }
 
 async function fullFlow(){
   setStatus('Leyendo…'); fullParse();
-  const needGeo = points.some(p=> !(typeof p.lat==='number' && typeof p.lng==='number'));
+  const needGeo = points.some(p=> !(isFinite(p.lat) && isFinite(p.lng)));
   if(needGeo){ await geocodeMissing(); }
   if(points.length<2){ setStatus('Necesitás al menos 2 puntos.'); return; }
   setStatus('Optimizando…');
@@ -366,11 +365,13 @@ async function fullFlow(){
   const chunks=buildDirLinks(route, (startPoint||route[0]), circular, 10);
   const wrap=$("dirLinks"); wrap.innerHTML='';
   chunks.forEach((ch,idx)=>{
+    const fromTxt = (isFinite(ch.from?.lat)&&isFinite(ch.from?.lng)) ? `${ch.from.lat.toFixed(4)},${ch.from.lng.toFixed(4)}` : '-';
+    const toTxt   = (isFinite(ch.to?.lat)&&isFinite(ch.to?.lng)) ? `${ch.to.lat.toFixed(4)},${ch.to.lng.toFixed(4)}` : '-';
     const div=document.createElement('div'); div.className='p-2 border rounded-lg flex items-center justify-between gap-3';
     div.innerHTML=`
       <div>
         <div class="text-xs text-slate-500">Tramo ${idx+1}:</div>
-        <div class="mono text-xs">${ch.from.lat.toFixed(4)},${ch.from.lng.toFixed(4)} → ${ch.to.lat.toFixed(4)},${ch.to.lng.toFixed(4)}</div>
+        <div class="mono text-xs">${fromTxt} → ${toTxt}</div>
       </div>
       <a href="${ch.url}" target="_blank" rel="noopener" class="px-3 py-1.5 rounded-lg bg-sky-700 text-white hover:bg-sky-800">Abrir</a>`;
     wrap.appendChild(div);
@@ -392,14 +393,12 @@ $("saveNamed").addEventListener('click', async () => {
   const obj = onSaveNamed(); // local
   try { await cloudSaveNamed(name, obj.id); } catch(e){ console.error(e); alert("No se pudo guardar en la nube"); }
 });
-
 $("updateNamed").addEventListener('click', async () => {
   const updated = onUpdateNamed(); // local
   if(updated){
     try { await cloudSaveNamed(updated.name, updated.id); } catch(e){ console.error(e); }
   }
 });
-
 $("loadNamed").addEventListener('click', onLoadNamed);
 $("renameNamed").addEventListener('click', onRenameNamed);
 
@@ -412,7 +411,6 @@ $("deleteNamed").addEventListener('click', async () => {
 $("exportNamed").addEventListener('click', onExportNamed);
 $("importNamed").addEventListener('change', (e)=>{ const f=e.target.files[0]; if(f) onImportNamed(f); e.target.value=''; });
 
-// Export CSV con columna "local"
 $("exportCsv").addEventListener('click', ()=>{
   if(!points.length){ alert('No hay puntos.'); return; }
   const header=['orden','local','direccion','lat','lng','dwell_min','abre','cierra'];
@@ -420,7 +418,8 @@ $("exportCsv").addEventListener('click', ()=>{
     i+1,
     (p.local||'').replaceAll('"','""'),
     (p.name||p.address||'').replaceAll('"','""'),
-    p.lat, p.lng,
+    isFinite(p.lat)?p.lat:'',
+    isFinite(p.lng)?p.lng:'',
     Math.max(0,parseInt(p.dwell||0,10)),
     p.open||'', p.close||''
   ]));
@@ -439,19 +438,16 @@ document.addEventListener('keydown', (e) => {
 });
 
 // ====== Firebase (Cloud) ======
-// Requiere que en index.html hayas inicializado window._firebase con db/auth/etc.
 async function cloudSaveNamed(name, forcedId){
   const fb = window._firebase;
   if(!fb){ console.warn("Firebase no inicializado"); return; }
   const { db, auth, doc, setDoc } = fb;
   const user = auth.currentUser;
   if(!user) { alert("Esperando autenticación…"); return; }
-  // Si viene un id (de onSaveNamed/onUpdateNamed) lo usamos; si no, capturamos nuevo
   const routeObj = forcedId ? { ...captureRouteObject(name), id: forcedId } : captureRouteObject(name);
   await setDoc(doc(db, "users", user.uid, "routes", routeObj.id), routeObj);
   setStatus("Ruta guardada en la nube ☁️");
 }
-
 async function cloudList(){
   const fb = window._firebase; if(!fb) return [];
   const { db, auth, collection, getDocs } = fb;
@@ -459,24 +455,6 @@ async function cloudList(){
   const snap = await getDocs(collection(db, "users", user.uid, "routes"));
   return snap.docs.map(d => d.data());
 }
-
-async function cloudSyncToLocal(){
-  try {
-    const list = await cloudList();        // lee todas tus rutas en Firestore
-    if(!list || !list.length) return;      // si no hay, nada que hacer
-    const locales = loadSavedRoutes();     // las que tenés en localStorage
-    const byId = Object.fromEntries(locales.map(r => [r.id, r]));
-    list.forEach(r => { byId[r.id] = r; }); // mergea por id (nube pisa local)
-    const merged = Object.values(byId);
-    saveSavedRoutes(merged);
-    refreshSavedSelect();
-    setStatus("Sincronizado con la nube al iniciar ☁️");
-  } catch(e){
-    console.error("cloudSyncToLocal:", e);
-  }
-}
-
-
 async function cloudDelete(id){
   const fb = window._firebase; if(!fb) return;
   const { db, auth, doc, deleteDoc } = fb;
@@ -485,24 +463,7 @@ async function cloudDelete(id){
   setStatus("Ruta borrada de la nube 🗑️");
 }
 
-// Sincronizar listado nube -> local (cuando abrís el select o si querés, ponelo en un botón)
-$("savedSelect").addEventListener('focus', async () => {
-  try {
-    const list = await cloudList();
-    if(!list.length) return;
-    const locales = loadSavedRoutes();
-    const byId = Object.fromEntries(locales.map(r=>[r.id, r]));
-    list.forEach(r => { byId[r.id] = r; });
-    const merged = Object.values(byId);
-    saveSavedRoutes(merged);
-    refreshSavedSelect();
-    setStatus("Sincronizado con la nube ☁️");
-  } catch(e){ console.error(e); }
-});
-
-// Inicial UI
-refreshSavedSelect();
-
+// Sync nube → local
 async function cloudSyncToLocal(){
   try {
     const list = await cloudList();
@@ -519,7 +480,7 @@ async function cloudSyncToLocal(){
   }
 }
 
-// Auto-sync al cargar (cuando Auth esté lista)
+// Auto-sync al cargar cuando Auth esté lista
 (function autoSyncOnLoad(){
   if (window._firebase && window._firebase.auth && window._firebase.onAuthStateChanged) {
     window._firebase.onAuthStateChanged(window._firebase.auth, async (user) => {
@@ -546,6 +507,8 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-// (Dejalo también si ya lo tenías)
-$("savedSelect").addEventListener('focus', cloudSyncToLocal);
+// Botón “Sincronizar ahora”
+$("syncNow")?.addEventListener('click', cloudSyncToLocal);
 
+// Inicial UI
+refreshSavedSelect();
