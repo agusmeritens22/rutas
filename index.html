@@ -166,84 +166,84 @@ Carnicería El Toro | Hipólito Yrigoyen 295, B7240 Lobos, BA"></textarea>
   <!-- Firebase (colocar TUS credenciales) -->
   <script type="module">
 import {
-  getAuth, signInAnonymously, onAuthStateChanged, setPersistence,
-  browserLocalPersistence, GoogleAuthProvider, signInWithPopup, signInWithRedirect, signOut
+  getAuth, signInAnonymously, onAuthStateChanged, setPersistence, browserLocalPersistence,
+  GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut
 } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js";
 
-// ... tu initializeApp(...) y getFirestore(...)
+// ... ya tenés initializeApp(firebaseConfig) y const auth = getAuth(app);
 
-const provider = new GoogleAuthProvider();
-
-// mantener sesión + login anónimo por defecto (para que funcione sin cuenta)
+// Mantener sesión y arrancar anónimo para que la app funcione sin login
 await setPersistence(auth, browserLocalPersistence);
-try { await signInAnonymously(auth); } catch (e) { console.error("Auth anónima:", e); }
+try {
+  await signInAnonymously(auth);
+} catch (e) {
+  console.error("Auth anónima:", e);
+}
 
-// Botones UI
+// Proveedor Google
+const provider = new GoogleAuthProvider();
+// Sugerencias de UX (opcional)
+provider.setCustomParameters({ prompt: 'select_account' });
+
+// --- Manejo de resultado de REDIRECT (necesario en móvil) ---
+try {
+  const redirectResult = await getRedirectResult(auth);
+  if (redirectResult?.user) {
+    console.log("Google redirect OK:", redirectResult.user.uid);
+  }
+} catch (e) {
+  console.error("Error en getRedirectResult:", e.code, e.message);
+  alert("No se pudo completar el inicio con Google (redirect).");
+}
+
+// Botón Entrar con Google
 document.getElementById('googleSignIn')?.addEventListener('click', async () => {
   try {
-    // En móvil, mejor redirect (popup a veces bloqueado)
-    if (/Mobi|Android/i.test(navigator.userAgent)) {
-      await signInWithRedirect(auth, provider);
+    const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+    if (isMobile) {
+      await signInWithRedirect(auth, provider);     // móvil: redirect
     } else {
-      await signInWithPopup(auth, provider);
+      await signInWithPopup(auth, provider);        // desktop: popup
     }
   } catch (e) {
-    alert("No se pudo iniciar sesión con Google");
-    console.error(e);
+    console.error("Google sign-in error:", e.code, e.message);
+    if (e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user') {
+      // Plan B si el popup se bloquea
+      try { await signInWithRedirect(auth, provider); } catch (e2) {
+        console.error("Fallback redirect error:", e2.code, e2.message);
+        alert("No se pudo iniciar sesión con Google.");
+      }
+    } else if (e.code === 'auth/unauthorized-domain') {
+      alert("Dominio no autorizado en Firebase Auth. Agregá 'agusmeritens22.github.io' en Authentication → Settings → Authorized domains.");
+    } else {
+      alert("No se pudo iniciar sesión con Google.");
+    }
   }
 });
 
+// Botón Salir
 document.getElementById('signOut')?.addEventListener('click', async () => {
-  await signOut(auth);
-  // volver a anónimo para que la app siga funcionando
-  await signInAnonymously(auth);
+  try {
+    await signOut(auth);
+    await signInAnonymously(auth); // volver a anónimo para que la app siga usable
+  } catch (e) {
+    console.error("SignOut error:", e);
+  }
 });
 
-// Mostrar quién está conectado y sincronizar
+// Mostrar quién está conectado y forzar sync nube→local cuando cambia el usuario
 onAuthStateChanged(auth, (user) => {
   const who = document.getElementById('whoami');
   if (user) {
     const info = user.isAnonymous ? 'Anónimo' : (user.email || 'Google');
     who && (who.textContent = `Conectado: ${info} (uid=${user.uid.slice(0,8)}…)`);
-    // forzar sincronización de Firestore -> local cuando cambia el usuario
+    // sincronizar rutas del nuevo UID
     window.cloudSyncToLocal?.();
   } else {
     who && (who.textContent = 'Sin sesión');
   }
 });
 
-    
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
-    import { 
-      getAuth, signInAnonymously, onAuthStateChanged, setPersistence, browserLocalPersistence 
-    } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js";
-    import { 
-      getFirestore, doc, setDoc, getDocs, collection, updateDoc, deleteDoc 
-    } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore.js";
-
-   const firebaseConfig = {
-  apiKey: "AIzaSyBMo1tBOmXVhY6QwgWbzvfAndltp9k4NZk",
-  authDomain: "rutas-da064.firebaseapp.com",
-  projectId: "rutas-da064",
-  storageBucket: "rutas-da064.firebasestorage.app",
-  messagingSenderId: "126930065003",
-  appId: "1:126930065003:web:1a40af65ab7f6b9afe832e"
-};
-
-    const app  = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db   = getFirestore(app);
-
-    await setPersistence(auth, browserLocalPersistence);
-    try { await signInAnonymously(auth); } catch (e) { console.error("Auth anónima:", e); }
-
-    window._firebase = { db, auth, onAuthStateChanged, doc, setDoc, getDocs, collection, updateDoc, deleteDoc };
-
-    onAuthStateChanged(auth, (user) => {
-      console.log('Auth state:', user ? `OK uid=${user.uid}` : 'NO AUTH');
-      const el = document.getElementById("status");
-      if (el && user) el.textContent = "Autenticado (anónimo) ✔️";
-    });
   </script>
 
   <script>
