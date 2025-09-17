@@ -1,28 +1,25 @@
-const CACHE = 'rutas-timewin-v12';
+const CACHE = 'rutas-timewin-v13';
 const FILES = [
   './',
   './index.html',
-  './app.js?v=12'
-  // Agregá manifest e íconos si están en tu repo:
-  // './manifest.webmanifest?v=12',
-  // './icons/icon-192.png',
-  // './icons/icon-512.png'
+  './app.js?v=13',
+  './manifest.webmanifest?v=13'
 ];
 
-self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)));
+self.addEventListener('install', (e)=>{
+  e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)));
   self.skipWaiting();
 });
 
-self.addEventListener('activate', (e) => {
+self.addEventListener('activate', (e)=>{
   e.waitUntil(
-    caches.keys().then(keys => Promise.all(keys.map(k => k !== CACHE ? caches.delete(k) : null)))
+    caches.keys().then(keys=>Promise.all(keys.map(k=>k!==CACHE?caches.delete(k):null)))
   );
   self.clients.claim();
 });
 
-self.addEventListener('fetch', (e) => {
+self.addEventListener('fetch', (e)=>{
   e.respondWith(
-    caches.match(e.request).then(r => r || fetch(e.request).catch(() => caches.match('./index.html')))
+    caches.match(e.request).then(r=>r || fetch(e.request).catch(()=>caches.match('./index.html')))
   );
 });
