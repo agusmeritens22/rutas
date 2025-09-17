@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>SOLGISTIC for AM</title>
+  <title>SOLGISTICA · Planificador de Rutas</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <meta name="theme-color" content="#000000" />
   <link rel="manifest" href="manifest.webmanifest?v=15">
@@ -184,97 +184,98 @@ Carnicería El Toro | Hipólito Yrigoyen 295, B7240 Lobos, BA"></textarea>
 
   <!-- Firebase + login obligatorio (idéntico al anterior) -->
   <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
-    import { getAuth, onAuthStateChanged, setPersistence, browserLocalPersistence, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js";
-    import { getFirestore, doc, setDoc, getDocs, collection, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore.js";
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
+  import { getAuth, onAuthStateChanged, setPersistence, browserLocalPersistence,
+           GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js";
+  import { getFirestore, doc, setDoc, getDocs, collection, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore.js";
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyBMo1tBOmXVhY6QwgWbzvfAndltp9k4NZk",
-      authDomain: "rutas-da064.firebaseapp.com",
-      projectId: "rutas-da064",
-      storageBucket: "rutas-da064.appspot.com",
-      messagingSenderId: "126930065003",
-      appId: "1:126930065003:web:1a40af65ab7f6b9afe832e"
-    };
+  const firebaseConfig = {
+    apiKey: "AIzaSyBMo1tBOmXVhY6QwgWbzvfAndltp9k4NZk",
+    authDomain: "rutas-da064.firebaseapp.com",
+    projectId: "rutas-da064",
+    storageBucket: "rutas-da064.appspot.com",
+    messagingSenderId: "126930065003",
+    appId: "1:126930065003:web:1a40af65ab7f6b9afe832e"
+  };
 
-    // --- Init
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db   = getFirestore(app);
-    window._firebase = { db, auth, onAuthStateChanged, doc, setDoc, getDocs, collection, updateDoc, deleteDoc };
+  const app  = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db   = getFirestore(app);
+  window._firebase = { db, auth, onAuthStateChanged, doc, setDoc, getDocs, collection, updateDoc, deleteDoc };
 
-    const gate = document.getElementById('authGate');
-    const btn  = document.getElementById('googleSignIn');
-    const err  = document.getElementById('authError');
+  const gate = document.getElementById('authGate');
+  const btn  = document.getElementById('googleSignIn');
+  const err  = document.getElementById('authError');
 
-    function showGate(msg=''){
-      gate.style.display='flex';
-      gate.classList.remove('hidden');
-      if(msg){ err.textContent=msg; err.classList.remove('hidden'); }
+  function showGate(msg=''){
+    gate.style.display='flex';
+    gate.classList.remove('hidden');
+    if(msg){ err.textContent=msg; err.classList.remove('hidden'); }
+  }
+  function hideGate(){
+    gate.style.display='none';
+    gate.classList.add('hidden');
+    err.classList.add('hidden');
+    err.textContent='';
+  }
+
+  try { await setPersistence(auth, browserLocalPersistence); } catch(e){ console.warn('setPersistence error', e); }
+
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ prompt:'select_account' });
+
+  const isIOS = /iPad|iPhone|iPod/i.test(navigator.userAgent);
+  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
+  const REDIRECT_FLAG = 'authRedirectPending';
+  if (sessionStorage.getItem(REDIRECT_FLAG) === '1') hideGate();
+
+  try {
+    const rr = await getRedirectResult(auth);
+    if (rr?.user) hideGate();
+    sessionStorage.removeItem(REDIRECT_FLAG);
+  } catch (e) {
+    console.error('[Auth] Redirect error:', e?.code, e);
+    if (e?.code === 'auth/unauthorized-domain') {
+      showGate('Dominio no autorizado en Firebase Auth. Agregalo en Authentication → Settings → Authorized domains.');
     }
-    function hideGate(){
-      gate.style.display='none';
-      gate.classList.add('hidden');
-      err.classList.add('hidden');
-      err.textContent='';
+  }
+
+  onAuthStateChanged(auth, (user) => {
+    if (user && !user.isAnonymous) {
+      hideGate();
+      window.cloudSyncToLocal?.();
+    } else {
+      showGate();
     }
+  });
 
-    // --- Make persistence explicit
-    try { await setPersistence(auth, browserLocalPersistence); } catch(e){ console.warn('setPersistence error', e); }
-
-    const provider = new GoogleAuthProvider();
-    provider.setCustomParameters({ prompt:'select_account' });
-
-    // --- Handle redirect result ASAP (mobile flow)
+  btn?.addEventListener('click', async () => {
+    err.classList.add('hidden'); err.textContent='';
+    const useRedirect = isIOS || isSafari;
     try {
-      const rr = await getRedirectResult(auth);
-      if (rr?.user) {
-        console.log('[Auth] Redirect OK:', rr.user.uid);
-        hideGate();
+      if (useRedirect) {
+        sessionStorage.setItem(REDIRECT_FLAG, '1');
+        await signInWithRedirect(auth, provider);
+      } else {
+        await signInWithPopup(auth, provider);
       }
     } catch (e) {
-      console.error('[Auth] Redirect error:', e);
-      // no mostramos error todavía; dejamos que onAuthStateChanged decida
+      console.warn('[Auth] Popup/Redirect error:', e?.code);
+      sessionStorage.setItem(REDIRECT_FLAG, '1');
+      await signInWithRedirect(auth, provider);
     }
+  });
 
-    // --- Single source of truth: onAuthStateChanged
-    let firstAuthEvent = true;
-    onAuthStateChanged(auth, (user) => {
-      console.log('[Auth] onAuthStateChanged ->', !!user, user?.uid);
-      if (user && !user.isAnonymous) {
-        hideGate();
-        window.cloudSyncToLocal?.();
-      } else {
-        // Evitar flash: sólo mostrar el gate después del primer tick
-        if (!firstAuthEvent) showGate();
-      }
-      firstAuthEvent = false;
-    });
-
-    // --- Sign-in button: intenta popup y cae a redirect si no está soportado
-    btn?.addEventListener('click', async () => {
-      err.classList.add('hidden'); err.textContent='';
-      const isLikelyMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+  document.addEventListener('visibilitychange', async () => {
+    if (!document.hidden && !auth.currentUser) {
       try {
-        if (isLikelyMobile) {
-          await signInWithRedirect(auth, provider);
-        } else {
-          await signInWithPopup(auth, provider);
-        }
-      } catch (e) {
-        console.warn('[Auth] Popup/Redirect fallback:', e?.code);
-        // Fallback for Safari / ITP / environments without popup
-        if (e?.code === 'auth/operation-not-supported-in-this-environment' || e?.code === 'auth/popup-blocked' || e?.code === 'auth/popup-closed-by-user') {
-          try { await signInWithRedirect(auth, provider); return; } catch (e2) {
-            console.error('[Auth] Redirect fallback failed:', e2);
-          }
-        }
-        err.textContent = 'No se pudo iniciar sesión. Probá nuevamente.';
-        err.classList.remove('hidden');
-        showGate();
-      }
-    });
-  </script>
+        const rr = await getRedirectResult(auth);
+        if (rr?.user) hideGate();
+      } catch {}
+    }
+  });
+</script>
 
   <!-- Service Worker -->
   <script>
