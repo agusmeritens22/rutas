@@ -185,7 +185,7 @@ Carnicería El Toro | Hipólito Yrigoyen 295, B7240 Lobos, BA"></textarea>
   <!-- Firebase + login obligatorio (idéntico al anterior) -->
   <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
-  import { getAuth, onAuthStateChanged, setPersistence, browserLocalPersistence,
+  import { getAuth, onAuthStateChanged, setPersistence, browserLocalPersistence, inMemoryPersistence,
            GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js";
   import { getFirestore, doc, setDoc, getDocs, collection, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore.js";
 
@@ -225,14 +225,30 @@ Carnicería El Toro | Hipólito Yrigoyen 295, B7240 Lobos, BA"></textarea>
     err.textContent='';
   }
 
-  try { await setPersistence(auth, browserLocalPersistence); dbg('setPersistence OK'); } catch(e){ dbg('setPersistence error', e?.code||e); }
-
-  const provider = new GoogleAuthProvider();
-  provider.setCustomParameters({ prompt:'select_account' });
-
   const isIOS = /iPad|iPhone|iPod/i.test(navigator.userAgent);
   const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
   dbg('UA', navigator.userAgent, {isIOS, isSafari, host: location.host});
+
+  // --- Persistencia: local por defecto, pero en iOS/Safari caemos a inMemory
+  try {
+    if (isIOS || isSafari) {
+      await setPersistence(auth, inMemoryPersistence); // evita cookies bloqueadas por ITP
+      dbg('setPersistence inMemory (iOS/Safari) OK');
+    } else {
+      await setPersistence(auth, browserLocalPersistence);
+      dbg('setPersistence local OK');
+    }
+  } catch(e){
+    dbg('setPersistence error', e?.code||e);
+    try {
+      await setPersistence(auth, inMemoryPersistence);
+      dbg('fallback -> inMemory OK');
+    } catch(e2){ dbg('fallback inMemory error', e2?.code||e2); }
+  }
+
+  const provider = new GoogleAuthProvider();
+  // En algunos Safari/iOS, prompt extra puede interferir; lo usamos solo si NO es iOS/Safari
+  if (!(isIOS || isSafari)) provider.setCustomParameters({ prompt:'select_account' });
 
   const REDIRECT_FLAG = 'authRedirectPending';
   const wasRedirecting = sessionStorage.getItem(REDIRECT_FLAG) === '1';
@@ -253,13 +269,13 @@ Carnicería El Toro | Hipólito Yrigoyen 295, B7240 Lobos, BA"></textarea>
     }
   }
 
-  // Si venimos de redirect en iOS/Safari, hacemos un pequeño loop de reintentos
+  // Loop de reintento (extendido) para iOS/Safari
   async function settleRedirectIfNeeded(){
     if (!(isIOS || isSafari) || !wasRedirecting) return;
     hideGate();
     err.textContent = 'Completando inicio de sesión…';
     err.classList.remove('hidden');
-    const maxMs = 6000; const step = 600;
+    const maxMs = 12000; const step = 600; // 12s
     let elapsed = 0;
     while (elapsed <= maxMs && !auth.currentUser) {
       const ok = await tryGetRedirectResult('loop');
@@ -282,7 +298,7 @@ Carnicería El Toro | Hipólito Yrigoyen 295, B7240 Lobos, BA"></textarea>
 
   btn?.addEventListener('click', async () => {
     err.classList.add('hidden'); err.textContent='';
-    const useRedirect = isIOS || isSafari;
+    const useRedirect = true; // forzamos redirect siempre en iOS/Safari
     try {
       if (useRedirect) {
         sessionStorage.setItem(REDIRECT_FLAG, '1');
