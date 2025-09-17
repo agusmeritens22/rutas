@@ -6,11 +6,12 @@
   <title>Planificador de Rutas</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <meta name="theme-color" content="#0284c7" />
-  <link rel="manifest" href="manifest.webmanifest?v=12">
+  <link rel="manifest" href="manifest.webmanifest?v=13">
+  <style>.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,'Liberation Mono','Courier New',monospace}</style>
 </head>
 <body class="bg-slate-50 text-slate-800">
 
-  <!-- Hero simple con logo/título -->
+  <!-- Hero -->
   <header class="p-4 bg-sky-700 text-white text-center">
     <h1 class="text-xl font-bold">Planificador de Rutas</h1>
     <p class="text-sm opacity-90">Optimización con ventanas horarias + guardado en la nube</p>
@@ -18,20 +19,13 @@
 
   <!-- 🔒 Gate de autenticación (overlay) -->
   <style>
-    #authGate {
-      position: fixed; inset: 0;
-      background: rgba(0,0,0,0.65);
-      z-index: 9999;
-      backdrop-filter: blur(2px);
-    }
+    #authGate { position:fixed; inset:0; background:rgba(0,0,0,0.65); backdrop-filter:blur(2px); z-index:9999; }
   </style>
   <div id="authGate" class="flex">
     <div class="bg-white rounded-xl shadow-xl p-6 w-[90%] max-w-sm text-center m-auto">
       <h2 class="text-lg font-semibold mb-2">Iniciar sesión</h2>
       <p class="text-sm text-slate-600 mb-4">Debes iniciar sesión con Google para usar la app.</p>
-      <button id="googleSignIn" class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 w-full">
-        Entrar con Google
-      </button>
+      <button id="googleSignIn" class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 w-full">Entrar con Google</button>
       <p id="authError" class="text-xs text-red-600 mt-3 hidden"></p>
     </div>
   </div>
@@ -168,15 +162,12 @@ Carnicería El Toro | Hipólito Yrigoyen 295, B7240 Lobos, BA"></textarea>
     </section>
   </div>
 
-  <!-- App logic -->
-  <script src="app.js?v=12"></script>
+  <!-- Lógica de la app -->
+  <script src="app.js?v=13"></script>
 
   <!-- Geocoder -->
   <script>
-    window.GEOCODER = {
-      provider: 'opencage',
-      key: 'a24210fb3d144afc8d35ad8d5e339879' // tu key de OpenCage
-    };
+    window.GEOCODER = { provider: 'opencage', key: 'a24210fb3d144afc8d35ad8d5e339879' };
   </script>
 
   <!-- Firebase + login obligatorio -->
@@ -202,65 +193,29 @@ Carnicería El Toro | Hipólito Yrigoyen 295, B7240 Lobos, BA"></textarea>
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db   = getFirestore(app);
-
-    // Exponer para app.js
     window._firebase = { db, auth, onAuthStateChanged, doc, setDoc, getDocs, collection, updateDoc, deleteDoc };
 
-    // Gate refs
-    const gate   = document.getElementById('authGate');
-    const btn    = document.getElementById('googleSignIn');
-    const errBox = document.getElementById('authError');
+    const gate=document.getElementById('authGate'), btn=document.getElementById('googleSignIn'), err=document.getElementById('authError');
 
     await setPersistence(auth, browserLocalPersistence);
     const provider = new GoogleAuthProvider();
-    provider.setCustomParameters({ prompt: 'select_account' });
+    provider.setCustomParameters({ prompt:'select_account' });
 
-    function showGate(msg=''){
-      gate.style.display = 'flex';   // fuerza visibilidad
-      gate.classList.remove('hidden');
-      if (msg) { errBox.textContent = msg; errBox.classList.remove('hidden'); }
-    }
-    function hideGate(){
-      gate.style.display = 'none';   // fuerza ocultar
-      gate.classList.add('hidden');
-      errBox.classList.add('hidden'); errBox.textContent = '';
-    }
+    function showGate(msg=''){ gate.style.display='flex'; gate.classList.remove('hidden'); if(msg){ err.textContent=msg; err.classList.remove('hidden'); } }
+    function hideGate(){ gate.style.display='none'; gate.classList.add('hidden'); err.classList.add('hidden'); err.textContent=''; }
 
-    // Procesar redirect (móvil)
-    try {
-      const rr = await getRedirectResult(auth);
-      if(rr?.user){ console.log('Google redirect OK:', rr.user.uid); }
-    } catch(e){ console.error('Redirect error:', e); showGate('Error en login con Google.'); }
+    try{ const rr=await getRedirectResult(auth); if(rr?.user) console.log('Google redirect OK:', rr.user.uid); }
+    catch(e){ console.error('Redirect error:', e); showGate('Error en login con Google.'); }
 
-    // Forzar login al cargar
-    onAuthStateChanged(auth, (user)=>{
-      if(user && !user.isAnonymous){
-        console.log("Logueado:", user.email);
-        hideGate();
-        // sincronizar rutas del usuario actual
-        window.cloudSyncToLocal?.();
-      } else {
-        showGate();
-      }
-    });
+    onAuthStateChanged(auth,(user)=>{ if(user && !user.isAnonymous){ console.log('Logueado:', user.email||user.uid); hideGate(); window.cloudSyncToLocal?.(); } else { showGate(); } });
 
-    // Botón login
-    btn?.addEventListener('click', async ()=>{
-      try{
-        const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
-        if(isMobile){ await signInWithRedirect(auth, provider); }
-        else { await signInWithPopup(auth, provider); }
-      }catch(e){
-        console.error("Google sign-in error:", e);
-        showGate("No se pudo iniciar sesión con Google.");
-      }
-    });
+    btn?.addEventListener('click', async ()=>{ try{ const isMobile=/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent); if(isMobile) await signInWithRedirect(auth,provider); else await signInWithPopup(auth,provider); }catch(e){ console.error('Google sign-in error:',e); showGate('No se pudo iniciar sesión con Google.'); }});
   </script>
 
-  <!-- SW -->
+  <!-- Service Worker -->
   <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js'); });
+    if('serviceWorker' in navigator){
+      window.addEventListener('load', ()=>{ navigator.serviceWorker.register('./sw.js'); });
     }
   </script>
 </body>
