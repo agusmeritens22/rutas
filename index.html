@@ -36,7 +36,25 @@
   <div id="authGate" class="flex">
     <div class="bg-white rounded-xl shadow-xl p-6 w-[90%] max-w-sm text-center m-auto">
       <h2 class="text-lg font-semibold mb-2">Iniciar sesión</h2>
-      <p class="text-sm text-slate-600 mb-4">Debes iniciar sesión con Google para usar la app.</p>
+      <p class="text-sm text-slate-600 mb-4">Elegí cómo entrar para usar la app.</p>
+
+      <div class="space-y-2 text-left">
+        <label class="block text-sm">Email</label>
+        <input id="emailInput" type="email" class="w-full p-2 border rounded-lg text-sm" placeholder="tu@email.com" />
+        <label class="block text-sm mt-2">Contraseña</label>
+        <input id="passInput" type="password" class="w-full p-2 border rounded-lg text-sm" placeholder="••••••••" />
+      </div>
+
+      <div class="mt-3 grid grid-cols-2 gap-2">
+        <button id="emailSignIn" class="px-3 py-2 rounded-lg bg-slate-800 text-white hover:bg-slate-900 text-sm">Entrar</button>
+        <button id="emailSignUp" class="px-3 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 text-sm">Crear cuenta</button>
+      </div>
+      <button id="emailReset" class="mt-2 text-xs text-sky-700 hover:underline">Olvidé mi contraseña</button>
+
+      <div class="my-4 flex items-center gap-3 text-xs text-slate-400">
+        <div class="flex-1 h-px bg-slate-200"></div> o <div class="flex-1 h-px bg-slate-200"></div>
+      </div>
+
       <button id="googleSignIn" class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 w-full">Entrar con Google</button>
       <p id="authError" class="text-xs text-red-600 mt-3 hidden"></p>
     </div>
@@ -186,7 +204,8 @@ Carnicería El Toro | Hipólito Yrigoyen 295, B7240 Lobos, BA"></textarea>
   <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
   import { getAuth, onAuthStateChanged, setPersistence, browserLocalPersistence, inMemoryPersistence,
-           GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js";
+           GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult,
+           createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js";
   import { getFirestore, doc, setDoc, getDocs, collection, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore.js";
 
   const qs = new URLSearchParams(location.search);
@@ -210,8 +229,13 @@ Carnicería El Toro | Hipólito Yrigoyen 295, B7240 Lobos, BA"></textarea>
   window._firebase = { db, auth, onAuthStateChanged, doc, setDoc, getDocs, collection, updateDoc, deleteDoc };
 
   const gate = document.getElementById('authGate');
-  const btn  = document.getElementById('googleSignIn');
-  const err  = document.getElementById('authError');
+  const btnGoogle  = document.getElementById('googleSignIn');
+  const btnEmailIn = document.getElementById('emailSignIn');
+  const btnEmailUp = document.getElementById('emailSignUp');
+  const btnReset   = document.getElementById('emailReset');
+  const emailEl    = document.getElementById('emailInput');
+  const passEl     = document.getElementById('passInput');
+  const err        = document.getElementById('authError');
 
   function showGate(msg=''){
     gate.style.display='flex';
@@ -224,97 +248,102 @@ Carnicería El Toro | Hipólito Yrigoyen 295, B7240 Lobos, BA"></textarea>
     err.classList.add('hidden');
     err.textContent='';
   }
+  function showError(e){
+    const map = {
+      'auth/user-not-found':'Usuario no encontrado',
+      'auth/wrong-password':'Contraseña incorrecta',
+      'auth/invalid-email':'Email inválido',
+      'auth/email-already-in-use':'Ese email ya está en uso',
+      'auth/weak-password':'La contraseña es muy corta',
+    };
+    const msg = map[e?.code] || (e?.message || 'Error de autenticación');
+    err.textContent = msg; err.classList.remove('hidden'); dbg('auth error', e?.code||e);
+  }
 
   const isIOS = /iPad|iPhone|iPod/i.test(navigator.userAgent);
   const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
   dbg('UA', navigator.userAgent, {isIOS, isSafari, host: location.host});
 
-  // --- Persistencia: local por defecto, pero en iOS/Safari caemos a inMemory
+  // Persistencia: inMemory en iOS/Safari para evitar ITP
   try {
     if (isIOS || isSafari) {
-      await setPersistence(auth, inMemoryPersistence); // evita cookies bloqueadas por ITP
+      await setPersistence(auth, inMemoryPersistence);
       dbg('setPersistence inMemory (iOS/Safari) OK');
     } else {
       await setPersistence(auth, browserLocalPersistence);
       dbg('setPersistence local OK');
     }
-  } catch(e){
-    dbg('setPersistence error', e?.code||e);
-    try {
-      await setPersistence(auth, inMemoryPersistence);
-      dbg('fallback -> inMemory OK');
-    } catch(e2){ dbg('fallback inMemory error', e2?.code||e2); }
-  }
+  } catch(e){ dbg('setPersistence error', e?.code||e); }
 
+  // ===== Email/Password auth =====
+  btnEmailIn?.addEventListener('click', async () => {
+    err.classList.add('hidden'); err.textContent='';
+    try {
+      const email = emailEl.value.trim();
+      const pass  = passEl.value;
+      if(!email || !pass) return showError({message:'Completá email y contraseña'});
+      const { user } = await signInWithEmailAndPassword(auth, email, pass);
+      dbg('email signIn ->', user.uid);
+      hideGate();
+    } catch (e) { showError(e); }
+  });
+
+  btnEmailUp?.addEventListener('click', async () => {
+    err.classList.add('hidden'); err.textContent='';
+    try {
+      const email = emailEl.value.trim();
+      const pass  = passEl.value;
+      if(!email || !pass) return showError({message:'Completá email y contraseña'});
+      const { user } = await createUserWithEmailAndPassword(auth, email, pass);
+      dbg('email signUp ->', user.uid);
+      hideGate();
+    } catch (e) { showError(e); }
+  });
+
+  btnReset?.addEventListener('click', async () => {
+    try {
+      const email = emailEl.value.trim();
+      if(!email) return showError({message:'Ingresá tu email para enviar el link'});
+      await sendPasswordResetEmail(auth, email);
+      err.textContent = 'Te enviamos un link para restablecer la contraseña.'; err.classList.remove('hidden');
+    } catch(e){ showError(e); }
+  });
+
+  // ===== Google (opcional) =====
   const provider = new GoogleAuthProvider();
-  // En algunos Safari/iOS, prompt extra puede interferir; lo usamos solo si NO es iOS/Safari
   if (!(isIOS || isSafari)) provider.setCustomParameters({ prompt:'select_account' });
 
   const REDIRECT_FLAG = 'authRedirectPending';
-  const wasRedirecting = sessionStorage.getItem(REDIRECT_FLAG) === '1';
-  if (wasRedirecting) { hideGate(); dbg('Flag pending redirect -> hide gate'); }
 
   async function tryGetRedirectResult(tag){
     try {
       const rr = await getRedirectResult(auth);
       if (rr?.user) { hideGate(); dbg(`${tag} getRedirectResult -> user`, {uid: rr.user.uid}); return true; }
-      dbg(`${tag} getRedirectResult -> no user`);
-      return false;
+      dbg(`${tag} getRedirectResult -> no user`); return false;
+    } catch (e) { dbg(`${tag} getRedirectResult error`, e?.code||e); return false; }
+  }
+
+  btnGoogle?.addEventListener('click', async () => {
+    err.classList.add('hidden'); err.textContent='';
+    try {
+      dbg('try popup first');
+      await signInWithPopup(auth, provider);
+      dbg('popup ok');
     } catch (e) {
-      dbg(`${tag} getRedirectResult error`, e?.code||e);
-      if (e?.code === 'auth/unauthorized-domain') {
-        showGate('Dominio no autorizado en Firebase Auth. Agregalo en Authentication → Settings → Authorized domains.');
-      }
-      return false;
+      dbg('popup failed', e?.code||e);
+      sessionStorage.setItem(REDIRECT_FLAG, '1');
+      try { dbg('fallback to redirect'); await signInWithRedirect(auth, provider); } catch(e2){ dbg('redirect fallback failed', e2?.code||e2); }
     }
-  }
+  });
 
-  // Loop de reintento (extendido) para iOS/Safari
-  async function settleRedirectIfNeeded(){
-    if (!(isIOS || isSafari) || !wasRedirecting) return;
-    hideGate();
-    err.textContent = 'Completando inicio de sesión…';
-    err.classList.remove('hidden');
-    const maxMs = 12000; const step = 600; // 12s
-    let elapsed = 0;
-    while (elapsed <= maxMs && !auth.currentUser) {
-      const ok = await tryGetRedirectResult('loop');
-      if (ok || auth.currentUser) break;
-      await new Promise(r=>setTimeout(r, step));
-      elapsed += step; dbg('retry...', elapsed);
-    }
-    if (auth.currentUser) { err.classList.add('hidden'); hideGate(); }
-  }
-
-  await tryGetRedirectResult('initial');
-  await settleRedirectIfNeeded();
-  sessionStorage.removeItem(REDIRECT_FLAG);
-
+  // Estado global
   onAuthStateChanged(auth, (user) => {
     dbg('onAuthStateChanged', !!user, user?.uid);
     if (user && !user.isAnonymous) { hideGate(); window.cloudSyncToLocal?.(); }
     else { showGate(); }
   });
 
-  btn?.addEventListener('click', async () => {
-    err.classList.add('hidden'); err.textContent='';
-    const useRedirect = true; // forzamos redirect siempre en iOS/Safari
-    try {
-      if (useRedirect) {
-        sessionStorage.setItem(REDIRECT_FLAG, '1');
-        dbg('signInWithRedirect ...');
-        await signInWithRedirect(auth, provider);
-      } else {
-        dbg('signInWithPopup ...');
-        await signInWithPopup(auth, provider);
-      }
-    } catch (e) {
-      dbg('signIn error', e?.code||e);
-      sessionStorage.setItem(REDIRECT_FLAG, '1');
-      try { await signInWithRedirect(auth, provider); } catch(e2){ dbg('redirect fallback failed', e2?.code||e2); }
-    }
-  });
-
+  // Reintentos post-redirect (iOS)
   window.addEventListener('pageshow', async (ev) => {
     if (isIOS || ev.persisted) {
       dbg('pageshow (persisted=', !!ev.persisted, ') currentUser=', !!auth.currentUser);
