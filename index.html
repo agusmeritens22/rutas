@@ -189,6 +189,12 @@ Carnicería El Toro | Hipólito Yrigoyen 295, B7240 Lobos, BA"></textarea>
            GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js";
   import { getFirestore, doc, setDoc, getDocs, collection, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore.js";
 
+  const qs = new URLSearchParams(location.search);
+  const DEBUG = qs.get('debug') === '1';
+  const dPanel = document.getElementById('debugPanel');
+  const dLog = document.getElementById('debugLog');
+  function dbg(...args){ if(!DEBUG) return; dPanel.style.display='block'; const line = args.map(a=> (typeof a==='object'? JSON.stringify(a): String(a))).join(' '); dLog.textContent += `\n${new Date().toISOString().slice(11,19)} ${line}`; dLog.scrollTop = dLog.scrollHeight; console.log('[DBG]', ...args); }
+
   const firebaseConfig = {
     apiKey: "AIzaSyBMo1tBOmXVhY6QwgWbzvfAndltp9k4NZk",
     authDomain: "rutas-da064.firebaseapp.com",
@@ -219,35 +225,59 @@ Carnicería El Toro | Hipólito Yrigoyen 295, B7240 Lobos, BA"></textarea>
     err.textContent='';
   }
 
-  try { await setPersistence(auth, browserLocalPersistence); } catch(e){ console.warn('setPersistence error', e); }
+  try { await setPersistence(auth, browserLocalPersistence); dbg('setPersistence OK'); } catch(e){ dbg('setPersistence error', e?.code||e); }
 
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt:'select_account' });
 
   const isIOS = /iPad|iPhone|iPod/i.test(navigator.userAgent);
   const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+  dbg('UA', navigator.userAgent, {isIOS, isSafari, host: location.host});
 
   const REDIRECT_FLAG = 'authRedirectPending';
-  if (sessionStorage.getItem(REDIRECT_FLAG) === '1') hideGate();
+  const wasRedirecting = sessionStorage.getItem(REDIRECT_FLAG) === '1';
+  if (wasRedirecting) { hideGate(); dbg('Flag pending redirect -> hide gate'); }
 
-  try {
-    const rr = await getRedirectResult(auth);
-    if (rr?.user) hideGate();
-    sessionStorage.removeItem(REDIRECT_FLAG);
-  } catch (e) {
-    console.error('[Auth] Redirect error:', e?.code, e);
-    if (e?.code === 'auth/unauthorized-domain') {
-      showGate('Dominio no autorizado en Firebase Auth. Agregalo en Authentication → Settings → Authorized domains.');
+  async function tryGetRedirectResult(tag){
+    try {
+      const rr = await getRedirectResult(auth);
+      if (rr?.user) { hideGate(); dbg(`${tag} getRedirectResult -> user`, {uid: rr.user.uid}); return true; }
+      dbg(`${tag} getRedirectResult -> no user`);
+      return false;
+    } catch (e) {
+      dbg(`${tag} getRedirectResult error`, e?.code||e);
+      if (e?.code === 'auth/unauthorized-domain') {
+        showGate('Dominio no autorizado en Firebase Auth. Agregalo en Authentication → Settings → Authorized domains.');
+      }
+      return false;
     }
   }
 
-  onAuthStateChanged(auth, (user) => {
-    if (user && !user.isAnonymous) {
-      hideGate();
-      window.cloudSyncToLocal?.();
-    } else {
-      showGate();
+  // Si venimos de redirect en iOS/Safari, hacemos un pequeño loop de reintentos
+  async function settleRedirectIfNeeded(){
+    if (!(isIOS || isSafari) || !wasRedirecting) return;
+    hideGate();
+    err.textContent = 'Completando inicio de sesión…';
+    err.classList.remove('hidden');
+    const maxMs = 6000; const step = 600;
+    let elapsed = 0;
+    while (elapsed <= maxMs && !auth.currentUser) {
+      const ok = await tryGetRedirectResult('loop');
+      if (ok || auth.currentUser) break;
+      await new Promise(r=>setTimeout(r, step));
+      elapsed += step; dbg('retry...', elapsed);
     }
+    if (auth.currentUser) { err.classList.add('hidden'); hideGate(); }
+  }
+
+  await tryGetRedirectResult('initial');
+  await settleRedirectIfNeeded();
+  sessionStorage.removeItem(REDIRECT_FLAG);
+
+  onAuthStateChanged(auth, (user) => {
+    dbg('onAuthStateChanged', !!user, user?.uid);
+    if (user && !user.isAnonymous) { hideGate(); window.cloudSyncToLocal?.(); }
+    else { showGate(); }
   });
 
   btn?.addEventListener('click', async () => {
@@ -256,24 +286,28 @@ Carnicería El Toro | Hipólito Yrigoyen 295, B7240 Lobos, BA"></textarea>
     try {
       if (useRedirect) {
         sessionStorage.setItem(REDIRECT_FLAG, '1');
+        dbg('signInWithRedirect ...');
         await signInWithRedirect(auth, provider);
       } else {
+        dbg('signInWithPopup ...');
         await signInWithPopup(auth, provider);
       }
     } catch (e) {
-      console.warn('[Auth] Popup/Redirect error:', e?.code);
+      dbg('signIn error', e?.code||e);
       sessionStorage.setItem(REDIRECT_FLAG, '1');
-      await signInWithRedirect(auth, provider);
+      try { await signInWithRedirect(auth, provider); } catch(e2){ dbg('redirect fallback failed', e2?.code||e2); }
+    }
+  });
+
+  window.addEventListener('pageshow', async (ev) => {
+    if (isIOS || ev.persisted) {
+      dbg('pageshow (persisted=', !!ev.persisted, ') currentUser=', !!auth.currentUser);
+      if (!auth.currentUser) { await tryGetRedirectResult('pageshow'); }
     }
   });
 
   document.addEventListener('visibilitychange', async () => {
-    if (!document.hidden && !auth.currentUser) {
-      try {
-        const rr = await getRedirectResult(auth);
-        if (rr?.user) hideGate();
-      } catch {}
-    }
+    if (!document.hidden && !auth.currentUser) { dbg('visibilitychange -> retry'); await tryGetRedirectResult('visibility'); }
   });
 </script>
 
