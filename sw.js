@@ -1,11 +1,12 @@
-const CACHE = 'rutas-timewin-v13';
+// Después:
+const CACHE = 'rutas-timewin-v14';
 const FILES = [
   './',
   './index.html',
-  './app.js?v=13',
-  './manifest.webmanifest?v=13'
+  './app.js?v=14',
+  './manifest.webmanifest?v=14',
+  './logo.png' // <-- cachear el logo para offline
 ];
-
 self.addEventListener('install', (e)=>{
   e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)));
   self.skipWaiting();
