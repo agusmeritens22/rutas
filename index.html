@@ -6,7 +6,7 @@
   <title>SOLGISTICA · Planificador de Rutas</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <meta name="theme-color" content="#000000" />
-  <link rel="manifest" href="manifest.webmanifest?v=14">
+  <link rel="manifest" href="manifest.webmanifest?v=15">
   <style>
     .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,'Liberation Mono','Courier New',monospace}
     .container{max-width:90rem;margin-left:auto;margin-right:auto}
@@ -14,13 +14,14 @@
 </head>
 <body class="bg-slate-50 text-slate-800">
   <!-- Encabezado SOLGISTICA con banner responsive -->
-<header class="relative w-full h-24 sm:h-32 lg:h-48 bg-center bg-cover" style="background-image: url('./banner.png');">
-  <div class="relative container flex items-center justify-end h-full px-4 py-3 text-white">
-    <button class="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs sm:text-sm">USUARIO1</button>
-    <button class="ml-2 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs sm:text-sm">CERRAR SESIÓN</button>
-  </div>
-</header>
-
+  <header class="relative w-full h-24 sm:h-32 lg:h-48">
+    <img src="./banner.png" alt="Banner" class="absolute inset-0 w-full h-full object-cover" />
+    <div class="absolute inset-0 bg-black/40"></div>
+    <div class="relative container flex items-center justify-end h-full px-4 py-3 text-white">
+      <button class="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs sm:text-sm">USUARIO1</button>
+      <button class="ml-2 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs sm:text-sm">CERRAR SESIÓN</button>
+    </div>
+  </header>
 
   <!-- Hero (texto)  -->
   <div class="px-4 sm:px-6 container mt-3">
@@ -176,7 +177,7 @@ Carnicería El Toro | Hipólito Yrigoyen 295, B7240 Lobos, BA"></textarea>
   </div>
 
   <!-- Lógica de la app -->
-  <script src="app.js?v=14"></script>
+  <script src="app.js?v=15"></script>
 
   <!-- Geocoder -->
   <script>
@@ -198,32 +199,89 @@ Carnicería El Toro | Hipólito Yrigoyen 295, B7240 Lobos, BA"></textarea>
       appId: "1:126930065003:web:1a40af65ab7f6b9afe832e"
     };
 
+    // --- Init
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db   = getFirestore(app);
     window._firebase = { db, auth, onAuthStateChanged, doc, setDoc, getDocs, collection, updateDoc, deleteDoc };
 
-    const gate=document.getElementById('authGate'), btn=document.getElementById('googleSignIn'), err=document.getElementById('authError');
+    const gate = document.getElementById('authGate');
+    const btn  = document.getElementById('googleSignIn');
+    const err  = document.getElementById('authError');
 
-    await setPersistence(auth, browserLocalPersistence);
+    function showGate(msg=''){
+      gate.style.display='flex';
+      gate.classList.remove('hidden');
+      if(msg){ err.textContent=msg; err.classList.remove('hidden'); }
+    }
+    function hideGate(){
+      gate.style.display='none';
+      gate.classList.add('hidden');
+      err.classList.add('hidden');
+      err.textContent='';
+    }
+
+    // --- Make persistence explicit
+    try { await setPersistence(auth, browserLocalPersistence); } catch(e){ console.warn('setPersistence error', e); }
+
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt:'select_account' });
 
-    function showGate(msg=''){ gate.style.display='flex'; gate.classList.remove('hidden'); if(msg){ err.textContent=msg; err.classList.remove('hidden'); } }
-    function hideGate(){ gate.style.display='none'; gate.classList.add('hidden'); err.classList.add('hidden'); err.textContent=''; }
+    // --- Handle redirect result ASAP (mobile flow)
+    try {
+      const rr = await getRedirectResult(auth);
+      if (rr?.user) {
+        console.log('[Auth] Redirect OK:', rr.user.uid);
+        hideGate();
+      }
+    } catch (e) {
+      console.error('[Auth] Redirect error:', e);
+      // no mostramos error todavía; dejamos que onAuthStateChanged decida
+    }
 
-    try{ const rr=await getRedirectResult(auth); if(rr?.user) console.log('Google redirect OK:', rr.user.uid); }
-    catch(e){ console.error('Redirect error:', e); showGate('Error en login con Google.'); }
+    // --- Single source of truth: onAuthStateChanged
+    let firstAuthEvent = true;
+    onAuthStateChanged(auth, (user) => {
+      console.log('[Auth] onAuthStateChanged ->', !!user, user?.uid);
+      if (user && !user.isAnonymous) {
+        hideGate();
+        window.cloudSyncToLocal?.();
+      } else {
+        // Evitar flash: sólo mostrar el gate después del primer tick
+        if (!firstAuthEvent) showGate();
+      }
+      firstAuthEvent = false;
+    });
 
-    onAuthStateChanged(auth,(user)=>{ if(user && !user.isAnonymous){ console.log('Logueado:', user.email||user.uid); hideGate(); window.cloudSyncToLocal?.(); } else { showGate(); } });
-
-    btn?.addEventListener('click', async ()=>{ try{ const isMobile=/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent); if(isMobile) await signInWithRedirect(auth,provider); else await signInWithPopup(auth,provider); }catch(e){ console.error('Google sign-in error:',e); showGate('No se pudo iniciar sesión con Google.'); }});
+    // --- Sign-in button: intenta popup y cae a redirect si no está soportado
+    btn?.addEventListener('click', async () => {
+      err.classList.add('hidden'); err.textContent='';
+      const isLikelyMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+      try {
+        if (isLikelyMobile) {
+          await signInWithRedirect(auth, provider);
+        } else {
+          await signInWithPopup(auth, provider);
+        }
+      } catch (e) {
+        console.warn('[Auth] Popup/Redirect fallback:', e?.code);
+        // Fallback for Safari / ITP / environments without popup
+        if (e?.code === 'auth/operation-not-supported-in-this-environment' || e?.code === 'auth/popup-blocked' || e?.code === 'auth/popup-closed-by-user') {
+          try { await signInWithRedirect(auth, provider); return; } catch (e2) {
+            console.error('[Auth] Redirect fallback failed:', e2);
+          }
+        }
+        err.textContent = 'No se pudo iniciar sesión. Probá nuevamente.';
+        err.classList.remove('hidden');
+        showGate();
+      }
+    });
   </script>
 
   <!-- Service Worker -->
   <script>
     if('serviceWorker' in navigator){
-      window.addEventListener('load', ()=>{ navigator.serviceWorker.register('./sw.js?v=14'); });
+      window.addEventListener('load', ()=>{ navigator.serviceWorker.register('./sw.js?v=15'); });
     }
   </script>
 </body>
