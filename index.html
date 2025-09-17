@@ -14,10 +14,10 @@
 </head>
 <body class="bg-slate-50 text-slate-800">
   <!-- Encabezado SOLGISTICA con banner responsive -->
-  <header class="relative w-full h-24 sm:h-32 lg:h-48">
-    <img src="./banner.png" alt="Banner" class="absolute inset-0 w-full h-full object-cover" />
-    <div class="absolute inset-0"></div>
+  <header class="relative w-full h-24 sm:h-32 lg:h-48 bg-center bg-cover" style="background-image: url('./banner.png');">
     <div class="relative container flex items-center justify-end h-full px-4 py-3 text-white">
+      <button class="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs sm:text-sm">USUARIO1</button>
+      <button class="ml-2 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs sm:text-sm">CERRAR SESIÓN</button>
     </div>
   </header>
 
@@ -276,6 +276,139 @@ Carnicería El Toro | Hipólito Yrigoyen 295, B7240 Lobos, BA"></textarea>
     }
   });
 </script>
+
+  <!-- Service Worker -->
+  <script>
+    if('serviceWorker' in navigator){
+      window.addEventListener('load', ()=>{ navigator.serviceWorker.register('./sw.js?v=15'); });
+    }
+  </script>
+  
+  <!-- Debug panel (se muestra con ?debug=1) -->
+  <div id="debugPanel" style="display:none; position:fixed; bottom:8px; right:8px; z-index:99999; max-width:90vw;">
+    <div style="background:#0b1220;color:#cde3ff;border:1px solid #122c5a;border-radius:10px;padding:10px; font:12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; box-shadow:0 6px 20px rgba(0,0,0,.25)">
+      <div style="font-weight:700;margin-bottom:6px">Auth Debug</div>
+      <pre id="debugLog" style="margin:0;white-space:pre-wrap;max-height:40vh;overflow:auto"></pre>
+    </div>
+  </div>
+
+  <!-- Lógica de la app -->
+  <script src="app.js?v=15"></script>
+
+  <!-- Geocoder -->
+  <script>
+    window.GEOCODER = { provider: 'opencage', key: 'a24210fb3d144afc8d35ad8d5e339879' };
+  </script>
+
+  <!-- Firebase + login (versión reforzada iOS/Safari con panel de debug) -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
+    import { getAuth, onAuthStateChanged, setPersistence, browserLocalPersistence, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js";
+    import { getFirestore, doc, setDoc, getDocs, collection, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore.js";
+
+    const qs = new URLSearchParams(location.search);
+    const DEBUG = qs.get('debug') === '1';
+    const dPanel = document.getElementById('debugPanel');
+    const dLog = document.getElementById('debugLog');
+    function dbg(...args){ if(!DEBUG) return; dPanel.style.display='block'; const line = args.map(a=> (typeof a==='object'? JSON.stringify(a): String(a))).join(' '); dLog.textContent += `
+${new Date().toISOString().slice(11,19)} ${line}`; dLog.scrollTop = dLog.scrollHeight; console.log('[DBG]', ...args); }
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBMo1tBOmXVhY6QwgWbzvfAndltp9k4NZk",
+      authDomain: "rutas-da064.firebaseapp.com",
+      projectId: "rutas-da064",
+      storageBucket: "rutas-da064.appspot.com",
+      messagingSenderId: "126930065003",
+      appId: "1:126930065003:web:1a40af65ab7f6b9afe832e"
+    };
+
+    const app  = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db   = getFirestore(app);
+    window._firebase = { db, auth, onAuthStateChanged, doc, setDoc, getDocs, collection, updateDoc, deleteDoc };
+
+    const gate = document.getElementById('authGate');
+    const btn  = document.getElementById('googleSignIn');
+    const err  = document.getElementById('authError');
+
+    function showGate(msg=''){
+      gate.style.display='flex';
+      gate.classList.remove('hidden');
+      if(msg){ err.textContent=msg; err.classList.remove('hidden'); }
+    }
+    function hideGate(){
+      gate.style.display='none';
+      gate.classList.add('hidden');
+      err.classList.add('hidden');
+      err.textContent='';
+    }
+
+    try { await setPersistence(auth, browserLocalPersistence); dbg('setPersistence OK'); } catch(e){ dbg('setPersistence error', e?.code||e); }
+
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt:'select_account' });
+
+    const isIOS = /iPad|iPhone|iPod/i.test(navigator.userAgent);
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    dbg('UA', navigator.userAgent, {isIOS, isSafari, host: location.host});
+
+    const REDIRECT_FLAG = 'authRedirectPending';
+    if (sessionStorage.getItem(REDIRECT_FLAG) === '1') { hideGate(); dbg('Flag pending redirect -> hide gate'); }
+
+    // Procesar resultado de redirect al cargar
+    try {
+      const rr = await getRedirectResult(auth);
+      if (rr?.user) { hideGate(); dbg('getRedirectResult -> user', {uid: rr.user.uid}); }
+      sessionStorage.removeItem(REDIRECT_FLAG);
+    } catch (e) {
+      dbg('getRedirectResult error', e?.code||e);
+      if (e?.code === 'auth/unauthorized-domain') {
+        showGate('Dominio no autorizado en Firebase Auth. Agregalo en Authentication → Settings → Authorized domains.');
+      }
+    }
+
+    onAuthStateChanged(auth, (user) => {
+      dbg('onAuthStateChanged', !!user, user?.uid);
+      if (user && !user.isAnonymous) { hideGate(); window.cloudSyncToLocal?.(); }
+      else { showGate(); }
+    });
+
+    btn?.addEventListener('click', async () => {
+      err.classList.add('hidden'); err.textContent='';
+      const useRedirect = isIOS || isSafari;
+      try {
+        if (useRedirect) {
+          sessionStorage.setItem(REDIRECT_FLAG, '1');
+          dbg('signInWithRedirect ...');
+          await signInWithRedirect(auth, provider);
+        } else {
+          dbg('signInWithPopup ...');
+          await signInWithPopup(auth, provider);
+        }
+      } catch (e) {
+        dbg('signIn error', e?.code||e);
+        sessionStorage.setItem(REDIRECT_FLAG, '1');
+        try { await signInWithRedirect(auth, provider); } catch(e2){ dbg('redirect fallback failed', e2?.code||e2); }
+      }
+    });
+
+    // iOS: al volver del redirect o desde el background, reintentar lectura
+    window.addEventListener('pageshow', async (ev) => {
+      if (isIOS || ev.persisted) {
+        dbg('pageshow (persisted=', !!ev.persisted, ') currentUser=', !!auth.currentUser);
+        if (!auth.currentUser) {
+          try { const rr = await getRedirectResult(auth); if (rr?.user) { hideGate(); dbg('pageshow -> got user'); } } catch {}
+        }
+      }
+    });
+
+    document.addEventListener('visibilitychange', async () => {
+      if (!document.hidden && !auth.currentUser) {
+        dbg('visibilitychange -> retry getRedirectResult');
+        try { const rr = await getRedirectResult(auth); if (rr?.user) hideGate(); } catch {}
+      }
+    });
+  </script>
 
   <!-- Service Worker -->
   <script>
