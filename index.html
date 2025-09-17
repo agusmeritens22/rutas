@@ -15,9 +15,9 @@
 <body class="bg-slate-50 text-slate-800">
   <!-- Encabezado SOLGISTICA con banner responsive -->
   <header class="relative w-full h-24 sm:h-32 lg:h-48 bg-center bg-cover" style="background-image: url('./banner.png');">
-    <div class="relative container flex items-center justify-end h-full px-4 py-3 text-white">
-      <button class="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs sm:text-sm">USUARIO1</button>
-      <button class="ml-2 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs sm:text-sm">CERRAR SESIÓN</button>
+    <div class="relative container flex items-center justify-end h-full px-4 py-3 text-white gap-2">
+      <span id="userEmail" class="px-2 py-1 rounded bg-white/10 text-xs sm:text-sm hidden"></span>
+      <button id="signOutBtn" class="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs sm:text-sm hidden">CERRAR SESIÓN</button>
     </div>
   </header>
 
@@ -205,14 +205,15 @@ Carnicería El Toro | Hipólito Yrigoyen 295, B7240 Lobos, BA"></textarea>
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
   import { getAuth, onAuthStateChanged, setPersistence, browserLocalPersistence, inMemoryPersistence,
            GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult,
-           createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js";
+           createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, signOut } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js";
   import { getFirestore, doc, setDoc, getDocs, collection, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore.js";
 
   const qs = new URLSearchParams(location.search);
   const DEBUG = qs.get('debug') === '1';
   const dPanel = document.getElementById('debugPanel');
   const dLog = document.getElementById('debugLog');
-  function dbg(...args){ if(!DEBUG) return; dPanel.style.display='block'; const line = args.map(a=> (typeof a==='object'? JSON.stringify(a): String(a))).join(' '); dLog.textContent += `\n${new Date().toISOString().slice(11,19)} ${line}`; dLog.scrollTop = dLog.scrollHeight; console.log('[DBG]', ...args); }
+  function dbg(...args){ if(!DEBUG) return; dPanel.style.display='block'; const line = args.map(a=> (typeof a==='object'? JSON.stringify(a): String(a))).join(' '); dLog.textContent += `
+${new Date().toISOString().slice(11,19)} ${line}`; dLog.scrollTop = dLog.scrollHeight; console.log('[DBG]', ...args); }
 
   const firebaseConfig = {
     apiKey: "AIzaSyBMo1tBOmXVhY6QwgWbzvfAndltp9k4NZk",
@@ -235,6 +236,8 @@ Carnicería El Toro | Hipólito Yrigoyen 295, B7240 Lobos, BA"></textarea>
   const btnReset   = document.getElementById('emailReset');
   const emailEl    = document.getElementById('emailInput');
   const passEl     = document.getElementById('passInput');
+  const userEmailEl = document.getElementById('userEmail');
+  const signOutBtn  = document.getElementById('signOutBtn');
   const err        = document.getElementById('authError');
 
   function showGate(msg=''){
@@ -339,8 +342,16 @@ Carnicería El Toro | Hipólito Yrigoyen 295, B7240 Lobos, BA"></textarea>
   // Estado global
   onAuthStateChanged(auth, (user) => {
     dbg('onAuthStateChanged', !!user, user?.uid);
-    if (user && !user.isAnonymous) { hideGate(); window.cloudSyncToLocal?.(); }
-    else { showGate(); }
+    if (user && !user.isAnonymous) {
+      if (userEmailEl){ userEmailEl.textContent = user.email || 'Usuario'; userEmailEl.classList.remove('hidden'); }
+      if (signOutBtn){ signOutBtn.classList.remove('hidden'); }
+      hideGate();
+      window.cloudSyncToLocal?.();
+    } else {
+      if (userEmailEl){ userEmailEl.textContent = ''; userEmailEl.classList.add('hidden'); }
+      if (signOutBtn){ signOutBtn.classList.add('hidden'); }
+      showGate();
+    }
   });
 
   // Reintentos post-redirect (iOS)
@@ -353,6 +364,11 @@ Carnicería El Toro | Hipólito Yrigoyen 295, B7240 Lobos, BA"></textarea>
 
   document.addEventListener('visibilitychange', async () => {
     if (!document.hidden && !auth.currentUser) { dbg('visibilitychange -> retry'); await tryGetRedirectResult('visibility'); }
+  });
+
+  // Cerrar sesión
+  signOutBtn?.addEventListener('click', async () => {
+    try { await signOut(auth); dbg('signOut ok'); } catch(e){ dbg('signOut error', e?.code||e); }
   });
 </script>
 
