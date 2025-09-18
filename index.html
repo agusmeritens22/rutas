@@ -144,6 +144,21 @@
           </div>
         </div>
 
+         <!-- Estado -->
+         <div class="card">
+          <h3 class="font-semibold mb-2">Estado</h3>
+          <div id="status" class="text-xs">Esperando entradas…</div>
+
+          <h3 class="font-semibold mt-4 mb-2">Resultados</h3>
+          <div id="results" class="text-sm space-y-2"><p>Aún sin resultados.</p></div>
+          <div class="mt-4 flex flex-col gap-2">
+            <button id="copyOrder" class="btn btn-soft">Copiar orden</button>
+            <button id="exportCsv" class="btn btn-primary">Exportar CSV</button>
+            <!-- NUEVO: abrir ruta en Google Maps -->
+            <button id="openInGMaps" class="btn btn-primary">Ver en Google Maps</button>
+          </div>
+        </div>
+
         <!-- Tabla editable -->
         <div id="inputTableWrap" class="card hidden">
           <h2 class="text-lg font-semibold mb-3">Puntos detectados</h2>
@@ -173,19 +188,7 @@
 
       <!-- Columna derecha: estado, guardar/cargar, links -->
       <aside class="xl:col-span-1 space-y-6">
-        <div class="card">
-          <h3 class="font-semibold mb-2">Estado</h3>
-          <div id="status" class="text-xs">Esperando entradas…</div>
-
-          <h3 class="font-semibold mt-4 mb-2">Resultados</h3>
-          <div id="results" class="text-sm space-y-2"><p>Aún sin resultados.</p></div>
-          <div class="mt-4 flex flex-col gap-2">
-            <button id="copyOrder" class="btn btn-soft">Copiar orden</button>
-            <button id="exportCsv" class="btn btn-primary">Exportar CSV</button>
-            <!-- NUEVO: abrir ruta en Google Maps -->
-            <button id="openInGMaps" class="btn btn-primary">Ver en Google Maps</button>
-          </div>
-        </div>
+       
 
         <div class="card">
           <h3 class="font-semibold mb-2">Rutas guardadas</h3>
