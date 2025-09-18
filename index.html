@@ -14,10 +14,9 @@
   <link href="https://fonts.googleapis.com/css2?family=Questrial&display=swap" rel="stylesheet">
 
   <meta name="theme-color" content="#000000" />
-  <link rel="manifest" href="manifest.webmanifest?v=15">
+  <link rel="manifest" href="manifest.webmanifest?v=16">
 
   <style>
-    /* Base + fondo */
     body{
       font-family:'Questrial', ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
       background:url('./fondo.jpg') no-repeat center center fixed;
@@ -26,7 +25,6 @@
     }
     .container{max-width:90rem;margin-left:auto;margin-right:auto}
 
-    /* Glassmorphism cards */
     .card{
       position:relative;
       background:rgba(255,255,255,.15);
@@ -39,7 +37,6 @@
     }
     @media (min-width:640px){ .card{ padding:1.5rem; } }
 
-    /* Botones */
     .btn{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;padding:.6rem .9rem;border-radius:1rem;font-weight:600;box-shadow:0 10px 24px rgba(2,6,23,.06);transition:transform .12s ease, box-shadow .2s, filter .2s, background .2s, color .2s}
     .btn:hover{transform:translateY(-1px)}
     .btn-primary{color:#fff;background:linear-gradient(135deg,#0ea5e9,#0369a1)}
@@ -47,14 +44,24 @@
     .btn-danger{color:#fff;background:linear-gradient(135deg,#ef4444,#b91c1c)}
     .btn-soft{background:#f1f5f9;color:#0f172a}
 
-    /* Auth gate */
     #authGate{position:fixed;inset:0;background:rgba(0,0,0,.5);backdrop-filter:blur(2px);z-index:9999}
+
+    /* Estilos de impresión para el cronograma */
+    @media print {
+      body { background: #fff !important; }
+      .no-print { display: none !important; }
+      .print-container { padding: 24px; }
+      .print-title { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+      .print-sub { color: #475569; margin-bottom: 16px; }
+      .print-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+      .print-table th, .print-table td { border: 1px solid #e2e8f0; padding: 8px; text-align: left; }
+      .print-table th { background: #f8fafc; }
+    }
   </style>
 </head>
 <body class="antialiased">
 
-  <!-- Header (banner opcional) -->
-  <header class="relative w-full h-24 sm:h-32 lg:h-48 bg-center bg-cover" style="background-image:url('./banner.png');">
+  <header class="relative w-full h-24 sm:h-32 lg:h-40 bg-center bg-cover no-print" style="background-image:url('./banner.png');">
     <div class="relative container flex items-center justify-end h-full px-4 py-3 text-white gap-2">
       <span id="userEmail" class="backdrop-blur-sm bg-white/20 border border-white/30 rounded-full px-3 py-1 text-xs sm:text-sm hidden"></span>
       <button id="signOutBtn" class="btn btn-soft text-xs sm:text-sm hidden">CERRAR SESIÓN</button>
@@ -62,7 +69,7 @@
   </header>
 
   <!-- Gate de autenticación -->
-  <div id="authGate" class="flex">
+  <div id="authGate" class="flex no-print">
     <div class="card w-[90%] max-w-sm text-center m-auto bg-white/30">
       <h2 class="text-lg font-semibold mb-2">Iniciar sesión</h2>
       <p class="text-sm text-slate-700 mb-4">Elegí cómo entrar para usar la app.</p>
@@ -147,24 +154,7 @@
           </div>
         </div>
 
-        <!-- Estado / Resultados (debajo a la izquierda) -->
-        <div class="card">
-          <h3 class="font-semibold mb-2">Estado</h3>
-          <div id="status" class="text-xs">Esperando entradas…</div>
-
-          <h3 class="font-semibold mt-4 mb-2">Resultados</h3>
-          <div id="results" class="text-sm space-y-2"><p>Aún sin resultados.</p></div>
-          <div class="mt-4 flex flex-col gap-2">
-            <button id="copyOrder" class="btn btn-soft">Copiar orden</button>
-            <button id="exportCsv" class="btn btn-primary">Exportar CSV</button>
-            <button id="openInGMaps" class="btn btn-primary">Ver en Google Maps</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- DERECHA -->
-      <div class="xl:col-span-4 space-y-6">
-        <!-- PUNTOS DETECTADOS (tabla) -->
+        <!-- PUNTOS DETECTADOS (MOVIDO AQUÍ EN EL MEDIO) -->
         <div id="inputTableWrap" class="bg-white rounded-2xl shadow p-4 sm:p-5 hidden">
           <h2 class="text-lg font-semibold mb-3">Puntos detectados</h2>
           <div class="overflow-x-auto">
@@ -190,7 +180,23 @@
           </div>
         </div>
 
-        <!-- Rutas guardadas -->
+        <!-- Estado / Resultados + Descargar PDF -->
+        <div class="card">
+          <h3 class="font-semibold mb-2">Estado</h3>
+          <div id="status" class="text-xs">Esperando entradas…</div>
+
+          <h3 class="font-semibold mt-4 mb-2">Resultados</h3>
+          <div id="results" class="text-sm space-y-2"><p>Aún sin resultados.</p></div>
+          <div class="mt-4 flex flex-col gap-2">
+            <button id="copyOrder" class="btn btn-soft">Copiar orden</button>
+            <button id="exportCsv" class="btn btn-primary">Exportar CSV</button>
+            <button id="downloadPdf" class="btn btn-primary">Descargar cronograma (PDF)</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- DERECHA (rutas y enlaces) -->
+      <div class="xl:col-span-4 space-y-6">
         <div class="card">
           <h3 class="font-semibold mb-2">Rutas guardadas</h3>
           <div class="grid grid-cols-1 gap-2">
@@ -216,7 +222,6 @@
           </div>
         </div>
 
-        <!-- Enlaces de navegación -->
         <div class="card">
           <h3 class="font-semibold mb-2">Enlaces de navegación</h3>
           <div id="dirLinks" class="text-sm space-y-2">
@@ -228,23 +233,20 @@
   </div>
 
   <!-- App logic -->
-  <script src="app.js?v=15"></script>
+  <script src="app.js?v=16"></script>
 
   <!-- Geocoder -->
   <script>
     window.GEOCODER = { provider: 'opencage', key: 'a24210fb3d144afc8d35ad8d5e339879' };
   </script>
 
-  <!-- Firebase + login -->
+  <!-- Firebase + login (igual que antes, sin cambios de funcionalidad) -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
     import { getAuth, onAuthStateChanged, setPersistence, browserLocalPersistence, inMemoryPersistence,
              GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult,
              createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, signOut } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js";
     import { getFirestore } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore.js";
-
-    const qs = new URLSearchParams(location.search);
-    const DEBUG = qs.get('debug') === '1';
 
     const firebaseConfig = {
       apiKey: "AIzaSyBMo1tBOmXVhY6QwgWbzvfAndltp9k4NZk",
@@ -254,21 +256,17 @@
       messagingSenderId: "126930065003",
       appId: "1:126930065003:web:1a40af65ab7f6b9afe832e"
     };
-
     const app  = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db   = getFirestore(app);
     window._firebase = { db, auth };
 
-    const gate   = document.getElementById('authGate');
-    const errEl  = document.getElementById('authError');
-    const emailEl= document.getElementById('emailInput');
-    const passEl = document.getElementById('passInput');
-    const signOutBtn = document.getElementById('signOutBtn');
-    const userEmail  = document.getElementById('userEmail');
+    const gate=document.getElementById('authGate'), err=document.getElementById('authError');
+    const emailEl=document.getElementById('emailInput'), passEl=document.getElementById('passInput');
+    const signOutBtn=document.getElementById('signOutBtn'), userEmail=document.getElementById('userEmail');
 
-    function showGate(msg=''){ gate.style.display='flex'; gate.classList.remove('hidden'); if(msg){ errEl.textContent=msg; errEl.classList.remove('hidden'); } }
-    function hideGate(){ gate.style.display='none'; gate.classList.add('hidden'); errEl.classList.add('hidden'); errEl.textContent=''; }
+    function showGate(msg=''){ gate.style.display='flex'; gate.classList.remove('hidden'); if(msg){ err.textContent=msg; err.classList.remove('hidden'); } }
+    function hideGate(){ gate.style.display='none'; gate.classList.add('hidden'); err.classList.add('hidden'); err.textContent=''; }
 
     try{
       const isIOS=/iPad|iPhone|iPod/i.test(navigator.userAgent);
@@ -276,30 +274,24 @@
       await setPersistence(auth, (isIOS||isSafari)? inMemoryPersistence : browserLocalPersistence);
     }catch(_){}
 
-    document.getElementById('emailSignIn')?.addEventListener('click', async ()=>{
-      try{ await signInWithEmailAndPassword(auth, emailEl.value.trim(), passEl.value); hideGate(); }catch(e){ errEl.textContent=e.message; errEl.classList.remove('hidden');}
-    });
-    document.getElementById('emailSignUp')?.addEventListener('click', async ()=>{
-      try{ await createUserWithEmailAndPassword(auth, emailEl.value.trim(), passEl.value); hideGate(); }catch(e){ errEl.textContent=e.message; errEl.classList.remove('hidden');}
-    });
-    document.getElementById('emailReset')?.addEventListener('click', async ()=>{
-      try{ await sendPasswordResetEmail(auth, emailEl.value.trim()); errEl.textContent='Te enviamos un link para restablecer.'; errEl.classList.remove('hidden'); }catch(e){ errEl.textContent=e.message; errEl.classList.remove('hidden');}
-    });
+    document.getElementById('emailSignIn')?.addEventListener('click', async ()=>{ try{ await signInWithEmailAndPassword(auth, emailEl.value.trim(), passEl.value); hideGate(); }catch(e){ err.textContent=e.message; err.classList.remove('hidden'); }});
+    document.getElementById('emailSignUp')?.addEventListener('click', async ()=>{ try{ await createUserWithEmailAndPassword(auth, emailEl.value.trim(), passEl.value); hideGate(); }catch(e){ err.textContent=e.message; err.classList.remove('hidden'); }});
+    document.getElementById('emailReset')?.addEventListener('click', async ()=>{ try{ await sendPasswordResetEmail(auth, emailEl.value.trim()); err.textContent='Te enviamos un link para restablecer.'; err.classList.remove('hidden'); }catch(e){ err.textContent=e.message; err.classList.remove('hidden'); }});
 
     const provider = new GoogleAuthProvider();
     document.getElementById('googleSignIn')?.addEventListener('click', async ()=>{
-      try{ await signInWithPopup(auth, provider); }catch(_){ try{ await signInWithRedirect(auth, provider); }catch(e){ errEl.textContent=e.message; errEl.classList.remove('hidden'); } }
+      try{ await signInWithPopup(auth, provider); }catch(_){ try{ await signInWithRedirect(auth, provider); }catch(e){ err.textContent=e.message; err.classList.remove('hidden'); } }
     });
 
-    onAuthStateChanged(auth, (user)=>{
-      if(user && !user.isAnonymous){
-        if(userEmail){ userEmail.textContent=user.email||'Usuario'; userEmail.classList.remove('hidden'); }
-        if(signOutBtn){ signOutBtn.classList.remove('hidden'); }
+    onAuthStateChanged(auth,(user)=>{ 
+      if(user && !user.isAnonymous){ 
+        userEmail?.classList.remove('hidden'); userEmail.textContent=user.email||'Usuario';
+        signOutBtn?.classList.remove('hidden');
         hideGate();
         window.cloudSyncToLocal?.();
-      }else{
-        if(userEmail){ userEmail.classList.add('hidden'); userEmail.textContent=''; }
-        if(signOutBtn){ signOutBtn.classList.add('hidden'); }
+      } else {
+        userEmail?.classList.add('hidden'); userEmail.textContent='';
+        signOutBtn?.classList.add('hidden');
         showGate();
       }
     });
@@ -310,7 +302,7 @@
   <!-- SW -->
   <script>
     if('serviceWorker' in navigator){
-      window.addEventListener('load', ()=>{ navigator.serviceWorker.register('./sw.js?v=15'); });
+      window.addEventListener('load', ()=>{ navigator.serviceWorker.register('./sw.js?v=16'); });
     }
   </script>
 </body>
