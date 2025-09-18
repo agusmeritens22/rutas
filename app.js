@@ -355,52 +355,18 @@ $("#downloadPdf")?.addEventListener("click", () => {
    Export PDF
    ========================================================== */
 function openSchedulePrint(schedule, totals) {
-  const win = window.open("", "_blank", "noopener,noreferrer");
-  const rows = schedule
-    .map(
-      (s) => `
-    <tr>
-      <td>${s.idx}</td>
-      <td>${s.name ? s.name : "-"}</td>
-      <td>${s.address}</td>
-      <td>${minToTimeStr(s.arrive)}</td>
-      <td>${minToTimeStr(s.depart)}</td>
-      <td>${s.travelMin} min</td>
-      <td>${s.waitMin} min</td>
-    </tr>`
-    )
-    .join("");
+  const rows = schedule.map(...).join("");
 
-  win.document.write(`
-<!DOCTYPE html><html><head><meta charset="utf-8">
-<title>Cronograma</title>
-<link href="https://fonts.googleapis.com/css2?family=Questrial&display=swap" rel="stylesheet">
-<style>
-  body{font-family:'Questrial', sans-serif; color:#0f172a;}
-  .print-container{padding:24px;}
-  .print-title{font-size:20px;font-weight:700;margin-bottom:8px;}
-  .print-sub{color:#475569;margin-bottom:16px;}
-  .print-table{width:100%;border-collapse:collapse;font-size:12px;}
-  .print-table th,.print-table td{border:1px solid #e2e8f0;padding:8px;text-align:left;}
-  .print-table th{background:#f8fafc;}
-</style>
-</head>
-<body>
-  <div class="print-container">
-    <div class="print-title">Cronograma</div>
-    <div class="print-sub">Paradas: ${schedule.length} · Distancia: ${fmt(
-    totals.km,
-    1
-  )} km · Duración: ${fmt(totals.min, 0)} min</div>
-    <table class="print-table">
-      <thead><tr>
-        <th>#</th><th>Local</th><th>Dirección</th>
-        <th>Llega</th><th>Sale</th><th>Traslado</th><th>Espera</th>
-      </tr></thead>
-      <tbody>${rows}</tbody>
-    </table>
-  </div>
-  <script>window.addEventListener('load',()=>window.print());</script>
-</body></html>`);
-  win.document.close();
+  const html = `<!DOCTYPE html> ... </html>`;
+
+  const blob = new Blob([html], { type: "text/html" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "cronograma.html";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
+
