@@ -87,22 +87,40 @@ function parseInputText() {
 
 /* ---------- Tabla ---------- */
 function renderTable() {
+  const wrap = document.getElementById('inputTableWrap');
+  const tbody = document.getElementById('inputTable');
+
   if (!state.rawRows.length) {
-    inputTableWrap.classList.add("hidden");
-    inputTable.innerHTML = "";
+    if (wrap) {
+      wrap.classList.add('hidden');
+      wrap.style.removeProperty('display');
+      wrap.style.removeProperty('visibility');
+    }
+    if (tbody) tbody.innerHTML = "";
     return;
   }
-  inputTableWrap.classList.remove("hidden");
 
-  inputTable.innerHTML = state.rawRows.map((r,i)=>{
-    const nameVal=(r.name||"").replaceAll('"',"&quot;");
-    const addrVal=(r.address||"").replaceAll('"',"&quot;");
-    const latVal = r.lat?.toFixed?.(6) ?? "";
-    const lngVal = r.lng?.toFixed?.(6) ?? "";
-    const precTxt = r.prec ? (r.prec>=8 ? "Exacta":"Aprox.") : "";
+  if (wrap) {
+    wrap.classList.remove('hidden');     // quita la clase hidden
+    wrap.style.display = 'block';         // fuerza display por si algún estilo lo oculta
+    wrap.style.visibility = 'visible';    // idem
+  }
+
+  if (!tbody) {
+    console.warn('No se encontró #inputTable en el DOM');
+    return;
+  }
+
+  tbody.innerHTML = state.rawRows.map((r, i) => {
+    const nameVal = (r.name || "").replaceAll('"', "&quot;");
+    const addrVal = (r.address || "").replaceAll('"', "&quot;");
+    const latVal  = r.lat?.toFixed?.(6) ?? "";
+    const lngVal  = r.lng?.toFixed?.(6) ?? "";
+    const precTxt = r.prec ? (r.prec >= 8 ? "Exacta" : "Aprox.") : "";
+
     return `
 <tr class="bg-white">
-  <td class="py-3 px-4">${i+1}</td>
+  <td class="py-3 px-4">${i + 1}</td>
   <td class="py-3 px-4">
     <input data-k="name" data-i="${i}" value="${nameVal}"
       class="w-full px-3 py-2 rounded-md border border-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-500"/>
@@ -113,7 +131,7 @@ function renderTable() {
   </td>
   <td class="py-3 px-4 mono">${latVal}</td>
   <td class="py-3 px-4 mono">${lngVal}</td>
-  <td class="py-3 px-4 ${precTxt==='Exacta'?'text-emerald-700':'text-amber-600'}">${precTxt}</td>
+  <td class="py-3 px-4 ${precTxt==='Exacta' ? 'text-emerald-700' : 'text-amber-600'}">${precTxt}</td>
   <td class="py-3 px-4">
     <input data-k="dwell" data-i="${i}" type="number" min="0" step="1" value="${r.dwell ?? 10}"
       class="w-24 px-3 py-2 rounded-md border border-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-500"/>
@@ -126,16 +144,21 @@ function renderTable() {
     <input data-k="close" data-i="${i}" type="time" value="${r.close || ''}"
       class="px-3 py-2 rounded-md border border-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-500"/>
   </td>
-</tr>`}).join("");
+</tr>`;
+  }).join("");
 
-  inputTable.querySelectorAll("input[data-k]").forEach(el=>{
-    el.addEventListener("change", ()=>{
-      const i=+el.dataset.i, k=el.dataset.k;
-      let v = el.value; if(k==="dwell") v = Number(v)||0;
-      state.rawRows[i][k]=v;
+  // bind cambios
+  tbody.querySelectorAll("input[data-k]").forEach((el) => {
+    el.addEventListener("change", () => {
+      const i = Number(el.dataset.i);
+      const k = el.dataset.k;
+      let v = el.value;
+      if (k === "dwell") v = Number(v) || 0;
+      state.rawRows[i][k] = v;
     });
   });
 }
+
 
 /* ---------- Mensajes / resultados ---------- */
 function setStatus(msg){ statusEl.textContent = msg; }
