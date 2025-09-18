@@ -4,85 +4,162 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>SOLGISTICA · Planificador de Rutas</title>
-
-  <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
-
-  <!-- Fuente -->
+  <!-- Fuente Questrial -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Questrial&display=swap" rel="stylesheet">
+  <meta name="theme-color" content="#000000" />
+  <link rel="manifest" href="manifest.webmanifest?v=15">
+  <!-- Fuente moderna -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    :root { --glass: rgba(255,255,255,.65); }
-    html,body{height:100%}
-    body{font-family:'Questrial',system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:#f4f6fb}
-    .container-max{max-width:1200px;margin:0 auto}
-    .card{background:var(--glass); backdrop-filter:saturate(120%) blur(16px); border:1px solid rgba(255,255,255,.4)}
+
+    
+    /* ===== Estilos base y fondo ===== */
+    body{
+      font-family:'Questrial', ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      background:url('./fondo.jpg') no-repeat center center fixed; /* tu fondo */
+      background-size:cover; /* cover para todas las pantallas */
+      color:#0f172a;
+    }
+    .container{max-width:90rem;margin-left:auto;margin-right:auto}
     .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,'Liberation Mono','Courier New',monospace}
-    /* Tabla más cómoda */
-    #inputTable th, #inputTable td{padding:14px 16px; vertical-align:middle; text-align:left}
-    #inputTable input{padding:10px 14px; font-size:14px; border-radius:10px; border:1px solid #d1d5db; width:100%}
-    #inputTable td:first-child + td input{min-width:200px; font-weight:600; font-size:15px}
-    textarea#links{padding:14px 16px; border-radius:12px; border:1px solid #cbd5e1}
+
+    /* ===== Glassmorphism ===== */
+    .card{ position:relative; background:rgba(255,255,255,.15); border-radius:1rem; border:1px solid rgba(255,255,255,.35); box-shadow:0 20px 50px rgba(0,0,0,.2); padding:1.25rem; backdrop-filter: blur(14px) saturate(180%); -webkit-backdrop-filter: blur(14px) saturate(180%); }
+    @media (min-width:640px){ .card{ padding:1.5rem; } }
+    .glass-strong{ background:rgba(255,255,255,.25); border-color:rgba(255,255,255,.45); backdrop-filter: blur(20px) saturate(200%); -webkit-backdrop-filter: blur(20px) saturate(200%); }
+
+    /* ===== Controles modernos ===== */
+    input[type="text"], input[type="number"], input[type="time"], input[type="email"], input[type="password"], select, textarea{
+      width:100%; background:#fff; border:1px solid #e2e8f0; border-radius:.9rem; padding:.625rem .75rem; font-size:0.95rem; transition:border-color .2s, box-shadow .2s, background .2s;
+    }
+    textarea{ line-height:1.45; }
+    input:focus, select:focus, textarea:focus{ outline:none; border-color:#38bdf8; box-shadow:0 0 0 4px rgba(56,189,248,.22); }
+
+    .btn{ display:inline-flex; align-items:center; justify-content:center; gap:.5rem; padding:.6rem .9rem; border-radius:1rem; font-weight:600; box-shadow:0 10px 24px rgba(2,6,23,.06); transition:transform .12s ease, box-shadow .2s, filter .2s, background .2s, color .2s; }
+    .btn:hover{ transform:translateY(-1px); }
+    .btn-primary{ color:white; background:linear-gradient(135deg,#0ea5e9,#0369a1); }
+    .btn-secondary{ color:white; background:linear-gradient(135deg,#f59e0b,#b45309); }
+    .btn-danger{ color:white; background:linear-gradient(135deg,#ef4444,#b91c1c); }
+    .btn-soft{ background:#f1f5f9; color:#0f172a; }
+    .btn-google{ color:white; background:#ea4335; }
+
+    .chip{ backdrop-filter:saturate(120%) blur(6px); background:rgba(255,255,255,.18); border:1px solid rgba(255,255,255,.28); border-radius:9999px; padding:.35rem .6rem; }
+  </style>
+
+  <style>
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,'Liberation Mono','Courier New',monospace}
+    .container{max-width:90rem;margin-left:auto;margin-right:auto}
+
+    /* 🔥 Ajustes de tabla */
+    #inputTable th,
+    #inputTable td {
+      padding: 14px 16px;  /* más espacio interno */
+      text-align: left;
+      vertical-align: middle;
+    }
+
+    #inputTable input {
+      padding: 10px 14px;
+      font-size: 14px;
+      border-radius: 8px;
+      border: 1px solid #d1d5db;
+      width: 100%;
+    }
+
+    #inputTable td:first-child + td input {
+      min-width: 180px;   /* Local más grande */
+      font-weight: 500;
+      font-size: 15px;
+    }
   </style>
 </head>
-
-<body class="text-slate-800">
-  <!-- Banner simple -->
-  <header class="w-full bg-gradient-to-r from-slate-900 via-rose-900/70 to-rose-600 text-white">
-    <div class="container-max px-4 py-4 flex items-center justify-between">
-      <div class="text-lg tracking-widest">SOLGISTICA</div>
-      <div class="text-xs opacity-80">Planificador de Rutas</div>
+<body class="antialiased">
+  <!-- ===== Header con banner (opcional) ===== -->
+  <header class="relative w-full h-24 sm:h-32 lg:h-48 bg-center bg-cover" style="background-image:url('./banner.png');">
+    <div class="relative container flex items-center justify-end h-full px-4 py-3 text-white gap-2">
+      <span id="userEmail" class="chip text-xs sm:text-sm hidden"></span>
+      <button id="signOutBtn" class="btn btn-soft text-xs sm:text-sm hidden">CERRAR SESIÓN</button>
     </div>
   </header>
 
-  <main class="container-max p-4 sm:p-6 space-y-6">
-    <section class="grid grid-cols-1 xl:grid-cols-3 gap-4">
-      <!-- Columna izquierda (2/3): entradas y tabla -->
-      <div class="xl:col-span-2 space-y-5">
-        <!-- Entradas -->
-        <div class="card rounded-2xl shadow px-4 sm:px-6 py-5">
-          <label for="links" class="block text-sm font-semibold mb-2">Direcciones o links (uno por línea):</label>
-          <textarea id="links" class="w-full h-44 mono"
-            placeholder="Formato recomendado: Local | Dirección
-Ej:
-La Esquina Market | Buenos Aires 787, B7240 Lobos, BA
-Carnicería El Toro | Hipólito Yrigoyen 295, B7240 Lobos, BA"></textarea>
+  <!-- ===== Gate de autenticación ===== -->
+  <style>
+    #authGate { position:fixed; inset:0; background:rgba(0,0,0,0.50); backdrop-filter:blur(2px); z-index:9999; }
+  </style>
+  <div id="authGate" class="flex">
+    <div class="card glass-strong w-[90%] max-w-sm text-center m-auto">
+      <h2 class="text-lg font-semibold mb-2">Iniciar sesión</h2>
+      <p class="text-sm text-slate-700 mb-4">Elegí cómo entrar para usar la app.</p>
+
+      <div class="space-y-2 text-left">
+        <label class="block text-sm">Email</label>
+        <input id="emailInput" type="email" class="w-full" placeholder="tu@email.com" />
+        <label class="block text-sm mt-2">Contraseña</label>
+        <input id="passInput" type="password" class="w-full" placeholder="••••••••" />
+      </div>
+
+      <div class="mt-3 grid grid-cols-2 gap-2">
+        <button id="emailSignIn" class="btn btn-primary">Entrar</button>
+        <button id="emailSignUp" class="btn btn-secondary">Crear cuenta</button>
+      </div>
+      <button id="emailReset" class="mt-2 text-xs text-sky-700 hover:underline">Olvidé mi contraseña</button>
+
+      <div class="my-4 flex items-center gap-3 text-xs text-slate-400">
+        <div class="flex-1 h-px bg-slate-200"></div> o <div class="flex-1 h-px bg-slate-200"></div>
+      </div>
+
+      <button id="googleSignIn" class="btn btn-google w-full">Entrar con Google</button>
+      <p id="authError" class="text-xs text-red-600 mt-3 hidden"></p>
+    </div>
+  </div>
+
+  <!-- ===== App ===== -->
+  <div id="app" class="container p-4 sm:p-6">
+    <section class="grid grid-cols-1 xl:grid-cols-3 gap-4 xl:gap-6">
+      <!-- Columna izquierda: entradas y tabla -->
+      <div class="xl:col-span-2 space-y-6">
+        <div class="card">
+          <label for="links" class="block text-sm font-medium mb-2">Direcciones o links (uno por línea):</label>
+          <textarea id="links" class="w-full h-44 p-4 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-500" placeholder="Formato recomendado: Local | Dirección: La Esquina Market | Buenos Aires 787, Lobos, Buenos Aires"></textarea>
 
           <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
             <label class="text-sm flex items-center gap-2">
               <input id="autoRun" type="checkbox" class="w-4 h-4 rounded" checked>
               Auto-geocodificar y optimizar
             </label>
-
+            <div class="flex items-center gap-2">
+              <label class="text-sm" for="avgSpeed">Velocidad media (km/h):</label>
+              <input id="avgSpeed" type="number" min="1" step="1" value="40" class="w-24" />
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="text-sm" for="defaultDwell">Estadía por parada (min):</label>
+              <input id="defaultDwell" type="number" min="0" step="1" value="10" class="w-24" />
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="text-sm" for="startTime">Hora de inicio:</label>
+              <input id="startTime" type="time" class="w-28" value="08:00" />
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="text-sm" for="defaultOpen">Apertura (default):</label>
+              <input id="defaultOpen" type="time" class="w-28" placeholder="08:00" />
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="text-sm" for="defaultClose">Cierre (default):</label>
+              <input id="defaultClose" type="time" class="w-28" placeholder="18:00" />
+            </div>
             <label class="text-sm flex items-center gap-2">
-              <span>Velocidad media (km/h):</span>
-              <input id="avgSpeed" type="number" min="1" step="1" value="40" class="w-24 p-2 border rounded-lg text-sm" />
+              <input id="useGeo" type="checkbox" class="w-4 h-4 rounded">
+              Usar mi ubicación como inicio
             </label>
-
-            <label class="text-sm flex items-center gap-2">
-              <span>Estadía por parada (min):</span>
-              <input id="defaultDwell" type="number" min="0" step="1" value="10" class="w-24 p-2 border rounded-lg text-sm" />
-            </label>
-
-            <label class="text-sm flex items-center gap-2">
-              <span>Hora de inicio:</span>
-              <input id="startTime" type="time" class="p-2 border rounded-lg text-sm" value="08:00" />
-            </label>
-
-            <label class="text-sm flex items-center gap-2">
-              <span>Apertura (default):</span>
-              <input id="defaultOpen" type="time" class="p-2 border rounded-lg text-sm" placeholder="08:00" />
-            </label>
-
-            <label class="text-sm flex items-center gap-2">
-              <span>Cierre (default):</span>
-              <input id="defaultClose" type="time" class="p-2 border rounded-lg text-sm" placeholder="18:00" />
-            </label>
-
             <label class="text-sm flex items-center gap-2">
               <input id="circular" type="checkbox" class="w-4 h-4 rounded">
               Ruta circular
             </label>
-
             <label class="text-sm flex items-center gap-2">
               <input id="enforceWindows" type="checkbox" class="w-4 h-4 rounded" checked>
               Respetar ventanas horarias
@@ -90,71 +167,195 @@ Carnicería El Toro | Hipólito Yrigoyen 295, B7240 Lobos, BA"></textarea>
           </div>
 
           <div class="mt-4 flex flex-wrap gap-3">
-            <button id="oneClick" class="px-4 py-2 rounded-xl bg-sky-700 text-white shadow hover:bg-sky-800">
-              Pegar y Optimizar
-            </button>
-            <button id="updateBtn" class="px-4 py-2 rounded-xl bg-amber-500 text-white hover:bg-amber-600">
-              Actualizar
-            </button>
-            <button id="clearBtn" class="px-4 py-2 rounded-xl bg-slate-200 text-slate-800 hover:bg-slate-300">
-              Limpiar
-            </button>
+            <button id="oneClick" class="btn btn-primary">Pegar y Optimizar</button>
+            <button id="updateBtn" class="btn btn-secondary">Actualizar</button>
+            <button id="clearBtn" class="btn btn-soft">Limpiar</button>
           </div>
         </div>
 
-        <!-- Puntos detectados -->
-        <div id="inputTableWrap" class="card rounded-2xl shadow px-4 sm:px-6 py-5 hidden">
+         <!-- Estado -->
+         <div class="card">
+          <h3 class="font-semibold mb-2">Estado</h3>
+          <div id="status" class="text-xs">Esperando entradas…</div>
+
+          <h3 class="font-semibold mt-4 mb-2">Resultados</h3>
+          <div id="results" class="text-sm space-y-2"><p>Aún sin resultados.</p></div>
+          <div class="mt-4 flex flex-col gap-2">
+            <button id="copyOrder" class="btn btn-soft">Copiar orden</button>
+            <button id="exportCsv" class="btn btn-primary">Exportar CSV</button>
+            <!-- NUEVO: abrir ruta en Google Maps -->
+            <button id="openInGMaps" class="btn btn-primary">Ver en Google Maps</button>
+          </div>
+        </div>
+
+        <!-- Tabla editable -->
+        <div id="inputTableWrap" class="card hidden">
           <h2 class="text-lg font-semibold mb-3">Puntos detectados</h2>
           <div class="overflow-x-auto">
-            <table class="min-w-full text-xs md:text-sm">
+            <table class="table-auto w-full text-sm bg-white rounded-xl">
               <thead>
-                <tr class="text-left text-slate-600">
-                  <th class="py-2 px-4">#</th>
-                  <th class="py-2 px-4">Local</th>
-                  <th class="py-2 px-4">Dirección</th>
-                  <th class="py-2 px-4">Lat</th>
-                  <th class="py-2 px-4">Lng</th>
-                  <th class="py-2 px-4">Precisión</th>
-                  <th class="py-2 px-4">Estadía</th>
-                  <th class="py-2 px-4">Abre</th>
-                  <th class="py-2 px-4">Cierra</th>
+                <tr class="text-left">
+                  <th class="py-2 pr-3">#</th>
+                  <th class="py-2 pr-3">Local</th>
+                  <th class="py-2 pr-3">Dirección</th>
+                  <th class="py-2 pr-3">Lat</th>
+                  <th class="py-2 pr-3">Lng</th>
+                  <th class="py-2 pr-3">Precisión</th>
+                  <th class="py-2 pr-3">Estadía</th>
+                  <th class="py-2 pr-3">Abre</th>
+                  <th class="py-2 pr-3">Cierra</th>
                 </tr>
               </thead>
               <tbody id="inputTable"></tbody>
             </table>
           </div>
-          <div class="mt-3 text-xs text-slate-600">
+          <div class="mt-3 text-xs text-slate-700">
             Podés editar <strong>Local</strong>, <strong>Abre/Cierra</strong> y <strong>Estadía</strong>. El cronograma usa estos valores.
           </div>
         </div>
       </div>
 
-      <!-- Columna derecha (1/3): estado y resultados -->
-      <aside class="xl:col-span-1 space-y-5">
-        <div class="card rounded-2xl shadow px-4 sm:px-6 py-5">
-          <h3 class="font-semibold mb-2">Estado</h3>
-          <div id="status" class="text-xs text-slate-600">Listo. Pegá direcciones para comenzar…</div>
+      <!-- Columna derecha: estado, guardar/cargar, links -->
+      <aside class="xl:col-span-1 space-y-6">
+       
 
-          <h3 class="font-semibold mt-4 mb-2">Resultados</h3>
-          <div id="results" class="text-sm space-y-2"><p class="text-slate-600">Aún sin resultados.</p></div>
-
-          <div class="mt-4 flex flex-col gap-2">
-            <button id="copyOrder" class="px-3 py-2 rounded-xl bg-slate-200 text-slate-800 hover:bg-slate-300">Copiar orden</button>
-            <button id="exportCsv" class="px-3 py-2 rounded-xl bg-sky-700 text-white hover:bg-sky-800">Exportar CSV</button>
-            <button id="downloadPdf" class="px-3 py-2 rounded-xl bg-sky-700 text-white hover:bg-sky-800">Descargar PDF</button>
+        <div class="card">
+          <h3 class="font-semibold mb-2">Rutas guardadas</h3>
+          <div class="grid grid-cols-1 gap-2">
+            <input id="routeName" type="text" placeholder="Nombre de la ruta" />
+            <div class="flex flex-wrap gap-2">
+              <button id="saveNamed" class="btn btn-primary">Guardar con nombre</button>
+              <button id="updateNamed" class="btn btn-soft">Actualizar</button>
+              <button id="syncNow" class="btn btn-soft">Sincronizar ahora</button>
+            </div>
+            <div class="flex items-center gap-2 mt-2">
+              <select id="savedSelect" class="flex-1"></select>
+            </div>
+            <div class="flex flex-wrap gap-2 mt-1">
+              <button id="loadNamed" class="btn btn-primary">Cargar</button>
+              <button id="renameNamed" class="btn btn-soft">Renombrar</button>
+              <button id="deleteNamed" class="btn btn-danger">Borrar</button>
+              <button id="exportNamed" class="btn btn-soft">Exportar JSON</button>
+              <label class="btn btn-soft cursor-pointer">
+                Importar JSON
+                <input id="importNamed" type="file" accept="application/json" class="hidden" />
+              </label>
+            </div>
           </div>
+        </div>
+
+        <div class="card">
+          <h3 class="font-semibold mb-2">Enlaces de navegación</h3>
+          <div id="dirLinks" class="text-sm space-y-2"><p>Se generan links a Google Maps por tramos.</p></div>
         </div>
       </aside>
     </section>
-  </main>
+  </div>
 
-  <!-- App -->
-  <script src="app.js?v=16"></script>
+  <!-- Panel de debug opcional -->
+  <div id="debugPanel" style="display:none; position:fixed; bottom:8px; right:8px; z-index:99999; max-width:90vw;">
+    <div style="background:#0b1220;color:#cde3ff;border:1px solid #122c5a;border-radius:10px;padding:10px; font:12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; box-shadow:0 6px 20px rgba(0,0,0,.25)">
+      <div style="font-weight:700;margin-bottom:6px">Auth Debug</div>
+      <pre id="debugLog" style="margin:0;white-space:pre-wrap;max-height:40vh;overflow:auto"></pre>
+    </div>
+  </div>
 
-  <!-- Geocoder config -->
+  <!-- ===== Scripts de la app ===== -->
+  <script src="app.js?v=15"></script>
+
+  <!-- Helper: botón "Ver en Google Maps". Reutiliza los puntos optimizados que tengas en tu app. -->
   <script>
-    // 🔑 Colocá tu API Key de OpenCage
-    window.GEOCODER = { provider: 'opencage', key: 'AQUI_TU_API_KEY' };
+    // API simple para que app.js nos pase los puntos optimizados en orden
+    // Usá window.setOptimizedPoints(lista) desde tu lógica cuando tengas lat/lng
+    window._optimizedPoints = [];
+    window.setOptimizedPoints = function(list){
+      // Espera objetos con address o {lat,lng}
+      window._optimizedPoints = Array.isArray(list) ? list : [];
+    };
+
+    document.getElementById('openInGMaps')?.addEventListener('click', () => {
+      const pts = window._optimizedPoints || [];
+      if (!pts.length) { alert('Primero optimizá las direcciones'); return; }
+      const url = 'https://www.google.com/maps/dir/' + pts.map(p => {
+        if (p.address) return encodeURIComponent(p.address);
+        if (p.lat != null && p.lng != null) return encodeURIComponent(`${p.lat},${p.lng}`);
+        return '';
+      }).filter(Boolean).join('/');
+      window.open(url, '_blank');
+    });
+  </script>
+
+  <!-- Geocoder (igual que antes) -->
+  <script>
+    window.GEOCODER = { provider: 'opencage', key: 'a24210fb3d144afc8d35ad8d5e339879' };
+  </script>
+
+  <!-- Firebase + login (email/contraseña y Google). Mantengo el bloque funcional anterior -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
+    import { getAuth, onAuthStateChanged, setPersistence, browserLocalPersistence, inMemoryPersistence,
+             GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult,
+             createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, signOut } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js";
+    import { getFirestore, doc, setDoc, getDocs, collection, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore.js";
+
+    const qs = new URLSearchParams(location.search);
+    const DEBUG = qs.get('debug') === '1';
+    const dPanel = document.getElementById('debugPanel');
+    const dLog = document.getElementById('debugLog');
+    function dbg(...args){ if(!DEBUG) return; dPanel.style.display='block'; const line = args.map(a=> (typeof a==='object'? JSON.stringify(a): String(a))).join(' '); dLog.textContent += `\n${new Date().toISOString().slice(11,19)} ${line}`; dLog.scrollTop = dLog.scrollHeight; console.log('[DBG]', ...args); }
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBMo1tBOmXVhY6QwgWbzvfAndltp9k4NZk",
+      authDomain: "rutas-da064.firebaseapp.com",
+      projectId: "rutas-da064",
+      storageBucket: "rutas-da064.appspot.com",
+      messagingSenderId: "126930065003",
+      appId: "1:126930065003:web:1a40af65ab7f6b9afe832e"
+    };
+
+    const app  = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db   = getFirestore(app);
+    window._firebase = { db, auth, onAuthStateChanged, doc, setDoc, getDocs, collection, updateDoc, deleteDoc };
+
+    const gate = document.getElementById('authGate');
+    const btnGoogle  = document.getElementById('googleSignIn');
+    const btnEmailIn = document.getElementById('emailSignIn');
+    const btnEmailUp = document.getElementById('emailSignUp');
+    const btnReset   = document.getElementById('emailReset');
+    const emailEl    = document.getElementById('emailInput');
+    const passEl     = document.getElementById('passInput');
+    const userEmailEl = document.getElementById('userEmail');
+    const signOutBtn  = document.getElementById('signOutBtn');
+    const err  = document.getElementById('authError');
+
+    function showGate(msg=''){ gate.style.display='flex'; gate.classList.remove('hidden'); if(msg){ err.textContent=msg; err.classList.remove('hidden'); } }
+    function hideGate(){ gate.style.display='none'; gate.classList.add('hidden'); err.classList.add('hidden'); err.textContent=''; }
+    function showError(e){ const map = { 'auth/user-not-found':'Usuario no encontrado', 'auth/wrong-password':'Contraseña incorrecta', 'auth/invalid-email':'Email inválido', 'auth/email-already-in-use':'Ese email ya está en uso', 'auth/weak-password':'La contraseña es muy corta', 'auth/operation-not-allowed':'Método no habilitado. Activá Email/Password en Firebase.'}; const msg = map[e?.code] || (e?.message || 'Error de autenticación'); err.textContent = msg; err.classList.remove('hidden'); dbg('auth error', e?.code||e); }
+
+    const isIOS = /iPad|iPhone|iPod/i.test(navigator.userAgent); const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    try { if (isIOS || isSafari) { await setPersistence(auth, inMemoryPersistence); dbg('setPersistence inMemory (iOS/Safari) OK'); } else { await setPersistence(auth, browserLocalPersistence); dbg('setPersistence local OK'); } } catch(e){ dbg('setPersistence error', e?.code||e); }
+
+    // Email/Password
+    btnEmailIn?.addEventListener('click', async () => { err.classList.add('hidden'); err.textContent=''; try { const { user } = await signInWithEmailAndPassword(auth, emailEl.value.trim(), passEl.value); dbg('email signIn ->', user.uid); hideGate(); } catch (e) { showError(e); } });
+    btnEmailUp?.addEventListener('click', async () => { err.classList.add('hidden'); err.textContent=''; try { const { user } = await createUserWithEmailAndPassword(auth, emailEl.value.trim(), passEl.value); dbg('email signUp ->', user.uid); hideGate(); } catch (e) { showError(e); } });
+    btnReset  ?.addEventListener('click', async () => { try { const email = emailEl.value.trim(); if(!email) return showError({message:'Ingresá tu email para enviar el link'}); await sendPasswordResetEmail(auth, email); err.textContent = 'Te enviamos un link para restablecer.'; err.classList.remove('hidden'); } catch(e){ showError(e); } });
+
+    // Google (opcional)
+    const provider = new GoogleAuthProvider();
+    btnGoogle?.addEventListener('click', async () => { err.classList.add('hidden'); err.textContent=''; try { dbg('try popup first'); await signInWithPopup(auth, provider); dbg('popup ok'); } catch (e) { dbg('popup failed', e?.code||e); try { await signInWithRedirect(auth, provider); } catch(e2){ dbg('redirect failed', e2?.code||e2); } } });
+
+    // Estado global
+    onAuthStateChanged(auth, (user) => { dbg('onAuthStateChanged', !!user, user?.uid); if (user && !user.isAnonymous) { if (userEmailEl){ userEmailEl.textContent = user.email || 'Usuario'; userEmailEl.classList.remove('hidden'); } if (signOutBtn){ signOutBtn.classList.remove('hidden'); } hideGate(); window.cloudSyncToLocal?.(); } else { if (userEmailEl){ userEmailEl.textContent = ''; userEmailEl.classList.add('hidden'); } if (signOutBtn){ signOutBtn.classList.add('hidden'); } showGate(); } });
+
+    signOutBtn?.addEventListener('click', async () => { try { await signOut(auth); dbg('signOut ok'); } catch(e){ dbg('signOut error', e?.code||e); } });
+  </script>
+
+  <!-- Service Worker -->
+  <script>
+    if('serviceWorker' in navigator){
+      window.addEventListener('load', ()=>{ navigator.serviceWorker.register('./sw.js?v=15'); });
+    }
   </script>
 </body>
 </html>
