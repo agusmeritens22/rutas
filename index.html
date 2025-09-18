@@ -16,6 +16,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
+
+    
     /* ===== Estilos base y fondo ===== */
     body{
       font-family:'Questrial', ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
@@ -47,6 +49,33 @@
     .btn-google{ color:white; background:#ea4335; }
 
     .chip{ backdrop-filter:saturate(120%) blur(6px); background:rgba(255,255,255,.18); border:1px solid rgba(255,255,255,.28); border-radius:9999px; padding:.35rem .6rem; }
+  </style>
+
+  <style>
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,'Liberation Mono','Courier New',monospace}
+    .container{max-width:90rem;margin-left:auto;margin-right:auto}
+
+    /* 🔥 Ajustes de tabla */
+    #inputTable th,
+    #inputTable td {
+      padding: 14px 16px;  /* más espacio interno */
+      text-align: left;
+      vertical-align: middle;
+    }
+
+    #inputTable input {
+      padding: 10px 14px;
+      font-size: 14px;
+      border-radius: 8px;
+      border: 1px solid #d1d5db;
+      width: 100%;
+    }
+
+    #inputTable td:first-child + td input {
+      min-width: 180px;   /* Local más grande */
+      font-weight: 500;
+      font-size: 15px;
+    }
   </style>
 </head>
 <body class="antialiased">
