@@ -354,53 +354,65 @@ $("#downloadPdf")?.addEventListener("click", () => {
 /* ==========================================================
    Export PDF
    ========================================================== */
+// Reemplazo: genera y DESCARGA el PDF directamente con html2pdf.js
 function openSchedulePrint(schedule, totals) {
-  const win = window.open("", "_blank", "noopener,noreferrer");
-  const rows = schedule
-    .map(
-      (s) => `
+  // Construimos el HTML del cronograma
+  const rows = schedule.map(s => `
     <tr>
       <td>${s.idx}</td>
-      <td>${s.name ? s.name : "-"}</td>
+      <td>${s.name ? s.name : '-'}</td>
       <td>${s.address}</td>
       <td>${minToTimeStr(s.arrive)}</td>
       <td>${minToTimeStr(s.depart)}</td>
       <td>${s.travelMin} min</td>
       <td>${s.waitMin} min</td>
-    </tr>`
-    )
-    .join("");
+    </tr>`).join("");
 
-  win.document.write(`
-<!DOCTYPE html><html><head><meta charset="utf-8">
-<title>Cronograma</title>
-<link href="https://fonts.googleapis.com/css2?family=Questrial&display=swap" rel="stylesheet">
-<style>
-  body{font-family:'Questrial', sans-serif; color:#0f172a;}
-  .print-container{padding:24px;}
-  .print-title{font-size:20px;font-weight:700;margin-bottom:8px;}
-  .print-sub{color:#475569;margin-bottom:16px;}
-  .print-table{width:100%;border-collapse:collapse;font-size:12px;}
-  .print-table th,.print-table td{border:1px solid #e2e8f0;padding:8px;text-align:left;}
-  .print-table th{background:#f8fafc;}
-</style>
-</head>
-<body>
-  <div class="print-container">
-    <div class="print-title">Cronograma</div>
-    <div class="print-sub">Paradas: ${schedule.length} · Distancia: ${fmt(
-    totals.km,
-    1
-  )} km · Duración: ${fmt(totals.min, 0)} min</div>
-    <table class="print-table">
-      <thead><tr>
-        <th>#</th><th>Local</th><th>Dirección</th>
-        <th>Llega</th><th>Sale</th><th>Traslado</th><th>Espera</th>
-      </tr></thead>
-      <tbody>${rows}</tbody>
-    </table>
-  </div>
-  <script>window.addEventListener('load',()=>window.print());</script>
-</body></html>`);
-  win.document.close();
+  const html = `
+    <div style="font-family:'Questrial',sans-serif;color:#0f172a;">
+      <div style="font-size:20px;font-weight:700;margin-bottom:8px;">Cronograma</div>
+      <div style="color:#475569;margin-bottom:16px;">
+        Paradas: ${schedule.length} · Distancia: ${fmt(totals.km,1)} km · Duración: ${fmt(totals.min,0)} min
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead>
+          <tr>
+            <th style="border:1px solid #e2e8f0;padding:8px;text-align:left;background:#f8fafc;">#</th>
+            <th style="border:1px solid #e2e8f0;padding:8px;text-align:left;background:#f8fafc;">Local</th>
+            <th style="border:1px solid #e2e8f0;padding:8px;text-align:left;background:#f8fafc;">Dirección</th>
+            <th style="border:1px solid #e2e8f0;padding:8px;text-align:left;background:#f8fafc;">Llega</th>
+            <th style="border:1px solid #e2e8f0;padding:8px;text-align:left;background:#f8fafc;">Sale</th>
+            <th style="border:1px solid #e2e8f0;padding:8px;text-align:left;background:#f8fafc;">Traslado</th>
+            <th style="border:1px solid #e2e8f0;padding:8px;text-align:left;background:#f8fafc;">Espera</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows}
+        </tbody>
+      </table>
+    </div>`;
+
+  // Crear un contenedor temporal (no visible) para pasar HTML a html2pdf
+  const holder = document.createElement('div');
+  holder.style.position = 'fixed';
+  holder.style.left = '-99999px';
+  holder.innerHTML = html;
+  document.body.appendChild(holder);
+
+  // Opciones de salida del PDF
+  const opt = {
+    margin:       10,
+    filename:     'cronograma.pdf',
+    image:        { type: 'jpeg', quality: 0.98 },
+    html2canvas:  { scale: 2, useCORS: true },
+    jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    pagebreak:    { mode: ['css', 'legacy'] }
+  };
+
+  html2pdf().set(opt).from(holder).save().then(() => {
+    document.body.removeChild(holder);
+  }).catch(() => {
+    document.body.removeChild(holder);
+    alert('No se pudo generar el PDF.');
+  });
 }
