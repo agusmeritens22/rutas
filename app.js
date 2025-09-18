@@ -122,10 +122,11 @@ function renderTable() {
       return `
 <tr class="bg-white">
   <td class="py-3 px-4">${i + 1}</td>
-  <td class="py-3 px-4">
-    <input data-k="name" data-i="${i}" value="${nameVal}"
-      class="w-full px-3 py-2 rounded-md border border-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-500"/>
-  </td>
+  <td class="py-4 px-5">
+  <input data-k="name" data-i="${i}" value="${nameVal}"
+    class="w-full px-4 py-3 text-[15px] font-medium rounded-md border border-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-500"/>
+</td>
+
   <td class="py-3 px-4 w-full">
     <input data-k="address" data-i="${i}" value="${addrVal}"
       class="w-full px-3 py-2 rounded-md border border-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-500"/>
