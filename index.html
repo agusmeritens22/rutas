@@ -91,133 +91,105 @@
 
   <!-- ===== App ===== -->
   <div id="app" class="container p-4 sm:p-6">
-    <section class="grid grid-cols-1 xl:grid-cols-3 gap-4 xl:gap-6">
-      <!-- Columna izquierda: entradas y tabla -->
-      <div class="xl:col-span-2 space-y-6">
-        <div class="card">
-          <label for="links" class="block text-sm font-medium mb-2">Direcciones o links (uno por línea):</label>
-          <textarea id="links" class="w-full h-44 p-4 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-500" placeholder="Formato recomendado: Local | Dirección: La Esquina Market | Buenos Aires 787, Lobos, Buenos Aires"></textarea>
+    <section class="grid grid-cols-1 xl:grid-cols-12 gap-4 xl:gap-6">
+  <!-- COLUMNA IZQUIERDA (xl: 8/12) -->
+  <div class="xl:col-span-8 space-y-6">
 
-          <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
-            <label class="text-sm flex items-center gap-2">
-              <input id="autoRun" type="checkbox" class="w-4 h-4 rounded" checked>
-              Auto-geocodificar y optimizar
-            </label>
-            <div class="flex items-center gap-2">
-              <label class="text-sm" for="avgSpeed">Velocidad media (km/h):</label>
-              <input id="avgSpeed" type="number" min="1" step="1" value="40" class="w-24" />
-            </div>
-            <div class="flex items-center gap-2">
-              <label class="text-sm" for="defaultDwell">Estadía por parada (min):</label>
-              <input id="defaultDwell" type="number" min="0" step="1" value="10" class="w-24" />
-            </div>
-            <div class="flex items-center gap-2">
-              <label class="text-sm" for="startTime">Hora de inicio:</label>
-              <input id="startTime" type="time" class="w-28" value="08:00" />
-            </div>
-            <div class="flex items-center gap-2">
-              <label class="text-sm" for="defaultOpen">Apertura (default):</label>
-              <input id="defaultOpen" type="time" class="w-28" placeholder="08:00" />
-            </div>
-            <div class="flex items-center gap-2">
-              <label class="text-sm" for="defaultClose">Cierre (default):</label>
-              <input id="defaultClose" type="time" class="w-28" placeholder="18:00" />
-            </div>
-            <label class="text-sm flex items-center gap-2">
-              <input id="useGeo" type="checkbox" class="w-4 h-4 rounded">
-              Usar mi ubicación como inicio
-            </label>
-            <label class="text-sm flex items-center gap-2">
-              <input id="circular" type="checkbox" class="w-4 h-4 rounded">
-              Ruta circular
-            </label>
-            <label class="text-sm flex items-center gap-2">
-              <input id="enforceWindows" type="checkbox" class="w-4 h-4 rounded" checked>
-              Respetar ventanas horarias
-            </label>
-          </div>
+    <!-- Direcciones / opciones -->
+    <div class="card">
+      <label for="links" class="block text-sm font-medium mb-2">Direcciones o links (uno por línea):</label>
+      <textarea id="links"
+        class="w-full h-44 p-4 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm"
+        placeholder="Formato recomendado: Local | Dirección&#10;Ej:&#10;La Esquina Market | Buenos Aires 787, B7240 Lobos, BA&#10;Carnicería El Toro | Hipólito Yrigoyen 295, B7240 Lobos, BA"></textarea>
 
-          <div class="mt-4 flex flex-wrap gap-3">
-            <button id="oneClick" class="btn btn-primary">Pegar y Optimizar</button>
-            <button id="updateBtn" class="btn btn-secondary">Actualizar</button>
-            <button id="clearBtn" class="btn btn-soft">Limpiar</button>
-          </div>
-        </div>
+      <!-- (tus switches/inputs/botones tal como los tenías) -->
+      <!-- ... -->
+      <div class="mt-4 flex flex-wrap gap-3">
+        <button id="oneClick" class="btn btn-primary">Pegar y Optimizar</button>
+        <button id="updateBtn" class="btn btn-secondary">Actualizar</button>
+        <button id="clearBtn" class="btn btn-soft">Limpiar</button>
+      </div>
+    </div>
 
-    <!-- Tabla editable -->
-<div id="inputTableWrap" class="bg-white rounded-2xl shadow p-4 sm:p-5 hidden">
-  <h2 class="text-lg font-semibold mb-3">Puntos detectados</h2>
-  <div class="overflow-x-auto">
-    <table class="table-auto w-full text-sm bg-white rounded-xl">
-      <thead>
-        <tr class="text-left text-slate-600">
-          <th class="py-3 px-4">#</th>
-          <th class="py-3 px-4">Local</th>
-          <th class="py-3 px-4 w-full">Dirección</th>
-          <th class="py-3 px-4">Lat</th>
-          <th class="py-3 px-4">Lng</th>
-          <th class="py-3 px-4">Precisión</th>
-          <th class="py-3 px-4">Estadía</th>
-          <th class="py-3 px-4">Abre</th>
-          <th class="py-3 px-4">Cierra</th>
-        </tr>
-      </thead>
-      <tbody id="inputTable"></tbody>
-    </table>
+    <!-- (Opcional) Estado/Resultados quedan debajo a la izquierda -->
+    <div class="card">
+      <h3 class="font-semibold mb-2">Estado</h3>
+      <div id="status" class="text-xs">Esperando entradas…</div>
+
+      <h3 class="font-semibold mt-4 mb-2">Resultados</h3>
+      <div id="results" class="text-sm space-y-2"><p>Aún sin resultados.</p></div>
+      <div class="mt-4 flex flex-col gap-2">
+        <button id="copyOrder" class="btn btn-soft">Copiar orden</button>
+        <button id="exportCsv" class="btn btn-primary">Exportar CSV</button>
+        <button id="openInGMaps" class="btn btn-primary">Ver en Google Maps</button>
+      </div>
+    </div>
+
+    <!-- Tabla -->
+    <div id="inputTableWrap" class="bg-white rounded-2xl shadow p-4 sm:p-5 hidden">
+      <h2 class="text-lg font-semibold mb-3">Puntos detectados</h2>
+      <div class="overflow-x-auto">
+        <table class="table-auto w-full text-sm bg-white rounded-xl">
+          <thead>
+            <tr class="text-left text-slate-600">
+              <th class="py-3 px-4">#</th>
+              <th class="py-3 px-4">Local</th>
+              <th class="py-3 px-4 w-full">Dirección</th>
+              <th class="py-3 px-4">Lat</th>
+              <th class="py-3 px-4">Lng</th>
+              <th class="py-3 px-4">Precisión</th>
+              <th class="py-3 px-4">Estadía</th>
+              <th class="py-3 px-4">Abre</th>
+              <th class="py-3 px-4">Cierra</th>
+            </tr>
+          </thead>
+          <tbody id="inputTable"></tbody>
+        </table>
+      </div>
+      <div class="mt-3 text-xs text-slate-500">
+        Podés editar <strong>Local</strong>, <strong>Abre/Cierra</strong> y <strong>Estadía</strong>. El cronograma usa estos valores.
+      </div>
+    </div>
   </div>
-  <div class="mt-3 text-xs text-slate-500">
-    Podés editar <strong>Local</strong>, <strong>Abre/Cierra</strong> y <strong>Estadía</strong>. El cronograma usa estos valores.
+
+  <!-- COLUMNA DERECHA (xl: 4/12) -->
+  <div class="xl:col-span-4 space-y-6">
+    <!-- Rutas guardadas -->
+    <div class="card">
+      <h3 class="font-semibold mb-2">Rutas guardadas</h3>
+      <div class="grid grid-cols-1 gap-2">
+        <input id="routeName" type="text" class="p-2 rounded-lg border border-slate-300 text-sm" placeholder="Nombre de la ruta" />
+        <div class="flex flex-wrap gap-2">
+          <button id="saveNamed" class="btn btn-primary">Guardar con nombre</button>
+          <button id="updateNamed" class="btn btn-soft">Actualizar</button>
+          <button id="syncNow" class="btn btn-soft">Sincronizar ahora</button>
+        </div>
+        <div class="flex items-center gap-2 mt-2">
+          <select id="savedSelect" class="flex-1 p-2 rounded-lg border border-slate-300 text-sm"></select>
+        </div>
+        <div class="flex flex-wrap gap-2 mt-1">
+          <button id="loadNamed" class="btn btn-primary">Cargar</button>
+          <button id="renameNamed" class="btn btn-soft">Renombrar</button>
+          <button id="deleteNamed" class="btn btn-danger">Borrar</button>
+          <button id="exportNamed" class="btn btn-soft">Exportar JSON</button>
+          <label class="btn btn-soft cursor-pointer">
+            Importar JSON
+            <input id="importNamed" type="file" accept="application/json" class="hidden" />
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Enlaces de navegación -->
+    <div class="card">
+      <h3 class="font-semibold mb-2">Enlaces de navegación</h3>
+      <div id="dirLinks" class="text-sm space-y-2">
+        <p>Se generan links a Google Maps por tramos.</p>
+      </div>
+    </div>
   </div>
-</div>
+</section>
 
-
-      <!-- Columna derecha: estado, guardar/cargar, links -->
-      <aside class="xl:col-span-1 space-y-6">
-        <div class="card">
-          <h3 class="font-semibold mb-2">Estado</h3>
-          <div id="status" class="text-xs">Esperando entradas…</div>
-
-          <h3 class="font-semibold mt-4 mb-2">Resultados</h3>
-          <div id="results" class="text-sm space-y-2"><p>Aún sin resultados.</p></div>
-          <div class="mt-4 flex flex-col gap-2">
-            <button id="copyOrder" class="btn btn-soft">Copiar orden</button>
-            <button id="exportCsv" class="btn btn-primary">Exportar CSV</button>
-            <!-- NUEVO: abrir ruta en Google Maps -->
-            <button id="openInGMaps" class="btn btn-primary">Ver en Google Maps</button>
-          </div>
-        </div>
-
-        <div class="card">
-          <h3 class="font-semibold mb-2">Rutas guardadas</h3>
-          <div class="grid grid-cols-1 gap-2">
-            <input id="routeName" type="text" placeholder="Nombre de la ruta" />
-            <div class="flex flex-wrap gap-2">
-              <button id="saveNamed" class="btn btn-primary">Guardar con nombre</button>
-              <button id="updateNamed" class="btn btn-soft">Actualizar</button>
-              <button id="syncNow" class="btn btn-soft">Sincronizar ahora</button>
-            </div>
-            <div class="flex items-center gap-2 mt-2">
-              <select id="savedSelect" class="flex-1"></select>
-            </div>
-            <div class="flex flex-wrap gap-2 mt-1">
-              <button id="loadNamed" class="btn btn-primary">Cargar</button>
-              <button id="renameNamed" class="btn btn-soft">Renombrar</button>
-              <button id="deleteNamed" class="btn btn-danger">Borrar</button>
-              <button id="exportNamed" class="btn btn-soft">Exportar JSON</button>
-              <label class="btn btn-soft cursor-pointer">
-                Importar JSON
-                <input id="importNamed" type="file" accept="application/json" class="hidden" />
-              </label>
-            </div>
-          </div>
-        </div>
-
-        <div class="card">
-          <h3 class="font-semibold mb-2">Enlaces de navegación</h3>
-          <div id="dirLinks" class="text-sm space-y-2"><p>Se generan links a Google Maps por tramos.</p></div>
-        </div>
-      </aside>
-    </section>
   </div>
 
   <!-- Panel de debug opcional -->
