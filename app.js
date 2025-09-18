@@ -1,7 +1,7 @@
 /* ==========================================================
-   SOLGISTICA · app.js (integrado + FIX de "Estado")
-   - Actualiza #status en cada paso (ya no queda en "Esperando entradas…")
-   - Mantiene enlaces robustos + ruta circular + todo el flujo original
+   SOLGISTICA · app.js (integrado + Estado + Enlaces robustos + Ruta circular + Guardar/Cargar rutas)
+   - Base: flujo original con estado en tiempo real, enlaces por tramo y ruta completa (chunk ≤10), circular
+   - NUEVO: Guardar/Cargar/Borrar/Exportar rutas en localStorage (con fallbacks y mensajes claros)
    ========================================================== */
 
 (function(){
@@ -26,8 +26,8 @@
   const inputTable = $("#inputTable");
   const resultsEl = $("#results");
   const dirLinksEl = $("#dirLinks");
-  const statusEl = $("#status");              // <-- FIX: referencia al estado
-  const autoRunEl = $("#autoRun");            // si existe, lo usamos
+  const statusEl = $("#status");
+  const autoRunEl = $("#autoRun");
   const circularEl = $("#circular");
 
   const avgSpeedEl = $("#avgSpeed");
@@ -41,10 +41,7 @@
   const state = { rawRows:[], schedule:[], totalKm:0, totalMin:0 };
 
   /* ---------- Estado helpers ---------- */
-  function setStatus(msg){
-    if (!statusEl) return;
-    statusEl.textContent = msg;
-  }
+  function setStatus(msg){ if (statusEl) statusEl.textContent = msg; }
 
   /* ==========================================================
      Geocoder (OpenCage)
@@ -290,6 +287,139 @@
   }
 
   /* ==========================================================
+     Guardar / Cargar / Borrar / Exportar rutas (localStorage)
+     ========================================================== */
+  function safeStorage(){
+    try{
+      const k="__test_ls__";
+      localStorage.setItem(k,"1"); localStorage.removeItem(k);
+      return localStorage;
+    }catch{ return null; }
+  }
+  const LS = safeStorage();
+  const ROUTES_KEY = "solgistica.routes.v1";
+
+  function readAllRoutes(){
+    if(!LS) return {};
+    try{ return JSON.parse(LS.getItem(ROUTES_KEY)||"{}"); }catch{ return {}; }
+  }
+  function writeAllRoutes(obj){
+    if(!LS) throw new Error("localStorage no disponible");
+    LS.setItem(ROUTES_KEY, JSON.stringify(obj));
+  }
+
+  function saveCurrentRoute(name){
+    if(!name || !name.trim()) throw new Error("Poné un nombre para la ruta.");
+    if(!state?.rawRows?.length) throw new Error("No hay datos para guardar. Cargá direcciones y generá el cronograma.");
+    const payload = {
+      name: name.trim(),
+      createdAt: new Date().toISOString(),
+      rows: state.rawRows,
+      schedule: state.schedule,
+      totals: { km: state.totalKm, min: state.totalMin }
+    };
+    const all = readAllRoutes();
+    all[payload.name] = payload; // sobrescribe si existe
+    writeAllRoutes(all);
+    return payload.name;
+  }
+  function listRoutes(){
+    const all = readAllRoutes();
+    return Object.values(all).sort((a,b)=> (a.name||"").localeCompare(b.name||""));
+  }
+  function loadRouteByName(name){
+    if(!name) throw new Error("Elegí una ruta de la lista.");
+    const all = readAllRoutes();
+    const it = all[name];
+    if(!it) throw new Error("No encontré esa ruta.");
+    state.rawRows = Array.isArray(it.rows) ? it.rows : [];
+    renderTable();
+    state.schedule = buildSchedule(state.rawRows);
+    state.totalKm = 0;
+    for (let i = 0; i < state.rawRows.length - 1; i++) {
+      state.totalKm += haversine(state.rawRows[i], state.rawRows[i + 1]);
+    }
+    state.totalMin = state.schedule.at(-1)?.depart ?? 0;
+    renderResultsSummary({ stops: state.rawRows.length, km: state.totalKm, min: state.totalMin });
+    const points = state.rawRows.map(r =>
+      (typeof r.address==="string" && r.address.trim())
+        ? { address:r.address.trim() }
+        : (typeof r.lat==="number" && typeof r.lng==="number" ? {lat:r.lat, lng:r.lng} : null)
+    ).filter(Boolean);
+    updateNavLinksAndAPI(points);
+  }
+  function deleteRouteByName(name){
+    if(!name) throw new Error("Elegí una ruta para borrar.");
+    const all = readAllRoutes();
+    if(!all[name]) throw new Error("Esa ruta no existe.");
+    delete all[name];
+    writeAllRoutes(all);
+  }
+  function exportRouteJSON(name){
+    const all = readAllRoutes();
+    const it = all[name];
+    if(!it) throw new Error("Elegí una ruta válida.");
+    const blob = new Blob([JSON.stringify(it, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `${name}.json`; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  /* ====== UI: Guardar / Cargar / Borrar / Exportar ====== */
+  const routeNameEl      = $("#routeName");
+  const saveRouteBtn     = $("#saveRouteBtn");
+  const routesListEl     = $("#routesList");
+  const refreshRoutesBtn = $("#refreshRoutesBtn");
+  const loadRouteBtn     = $("#loadRouteBtn");
+  const deleteRouteBtn   = $("#deleteRouteBtn");
+  const exportRouteBtn   = "#exportRouteBtn";
+
+  function refreshRoutesList(){
+    if(!routesListEl) return;
+    const items = listRoutes();
+    const current = routesListEl.value;
+    routesListEl.innerHTML = `<option value="">— Rutas guardadas —</option>` +
+      items.map(it => `<option value="${it.name}">${it.name}</option>`).join("");
+    if (current && items.find(x=>x.name===current)) routesListEl.value = current;
+  }
+
+  saveRouteBtn?.addEventListener("click", ()=>{
+    try{
+      if(!LS) return alert("No puedo guardar: localStorage deshabilitado por el navegador.");
+      const name = routeNameEl?.value || "";
+      const savedName = saveCurrentRoute(name);
+      refreshRoutesList();
+      if (routesListEl) routesListEl.value = savedName;
+      alert("Ruta guardada ✅");
+    }catch(e){ alert(e.message || "No se pudo guardar la ruta."); }
+  });
+  refreshRoutesBtn?.addEventListener("click", refreshRoutesList);
+  loadRouteBtn?.addEventListener("click", ()=>{
+    try{
+      const name = routesListEl?.value || "";
+      loadRouteByName(name);
+      alert("Ruta cargada ✅");
+    }catch(e){ alert(e.message || "No se pudo cargar la ruta."); }
+  });
+  deleteRouteBtn?.addEventListener("click", ()=>{
+    try{
+      const name = routesListEl?.value || "";
+      if (!name) return alert("Elegí una ruta para borrar.");
+      if (!confirm(`¿Borrar la ruta "${name}"?`)) return;
+      deleteRouteByName(name);
+      refreshRoutesList();
+      alert("Ruta borrada 🗑️");
+    }catch(e){ alert(e.message || "No se pudo borrar la ruta."); }
+  });
+  document.querySelector(exportRouteBtn)?.addEventListener("click", ()=>{
+    try{
+      const name = routesListEl?.value || "";
+      exportRouteJSON(name);
+    }catch(e){ alert(e.message || "No se pudo exportar la ruta."); }
+  });
+
+  /* ==========================================================
      Flujo principal
      ========================================================== */
   async function updateFromText(){
@@ -306,7 +436,6 @@
       }
       setStatus(`Procesando ${n} punto${n>1?'s':''}…`);
 
-      // Geocodificar faltantes
       for(let idx=0; idx<state.rawRows.length; idx++){
         const r = state.rawRows[idx];
         if(!r.lat || !r.lng){
@@ -320,7 +449,6 @@
       renderTable();
       setStatus("Generando cronograma…");
 
-      // Cronograma + totales
       state.schedule = buildSchedule(state.rawRows);
       state.totalKm = 0;
       for(let i=0;i<state.rawRows.length-1;i++){
@@ -330,7 +458,6 @@
 
       renderResultsSummary({ stops: state.rawRows.length, km: state.totalKm, min: state.totalMin });
 
-      // Enlaces navegación (con circular si aplica)
       setStatus("Armando enlaces de navegación…");
       const points = state.rawRows.map(r=> (typeof r.address==="string" && r.address.trim())
         ? { address:r.address.trim() }
@@ -407,12 +534,12 @@
     const lines = (linksTA.value||"").split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
     setStatus(lines.length ? `Detectadas ${lines.length} línea(s)…` : "Esperando entradas…");
     if (autoRunEl?.checked && lines.length) {
-      // Debounce simple
       clearTimeout(window.__autoRunTO);
       window.__autoRunTO = setTimeout(updateFromText, 400);
     }
   });
 
-  // Estado inicial
+  // Estado inicial + llenar combo de rutas si existe
   setStatus("Esperando entradas…");
+  (function initRoutesCombo(){ try{ const x=listRoutes(); if (x.length) { const el = $("#routesList"); if (el) { el.innerHTML = `<option value="">— Rutas guardadas —</option>` + x.map(it=>`<option value="${it.name}">${it.name}</option>`).join(""); } } }catch(_){} })();
 })();
