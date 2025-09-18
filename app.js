@@ -1,8 +1,7 @@
 /* ==========================================================
-   SOLGISTICA · app.js (geocodificación automática + cronograma)
+   SOLGISTICA · app.js (con PDF export y sin Google Maps)
    ========================================================== */
 
-/* ---------- Utils ---------- */
 const $ = (sel) => document.querySelector(sel);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const fmt = (n, d = 1) =>
@@ -38,7 +37,6 @@ const inputTableWrap = $("#inputTableWrap");
 const inputTable = $("#inputTable");
 const statusEl = $("#status");
 const resultsEl = $("#results");
-const dirLinksEl = $("#dirLinks");
 
 const avgSpeedEl = $("#avgSpeed");
 const defaultDwellEl = $("#defaultDwell");
@@ -50,15 +48,34 @@ const enforceWindowsEl = $("#enforceWindows");
 
 /* ---------- Estado ---------- */
 const state = {
-  rawRows: [], // [{name,address,lat,lng,prec,dwell,open,close}]
+  rawRows: [],
   orderedIdx: [],
-  schedule: [], // [{idx,name,address,arrive,depart,travelMin,waitMin}]
+  schedule: [],
   totalKm: 0,
   totalMin: 0,
 };
 
 /* ==========================================================
-   1) Parseo de textarea
+   Geocoder (OpenCage)
+   ========================================================== */
+async function geocode(address) {
+  const key = window.GEOCODER?.key;
+  const url =
+    "https://api.opencagedata.com/geocode/v1/json?no_annotations=1&language=es&limit=1&q=" +
+    encodeURIComponent(address) +
+    "&key=" +
+    encodeURIComponent(key);
+  const r = await fetch(url);
+  const j = await r.json();
+  const it = j.results?.[0];
+  if (!it) return null;
+  const { lat, lng } = it.geometry;
+  const prec = it.confidence ?? 0;
+  return { lat: Number(lat), lng: Number(lng), prec };
+}
+
+/* ==========================================================
+   Parseo de textarea
    ========================================================== */
 function parseInputText() {
   const lines = (linksTA?.value || "")
@@ -79,28 +96,7 @@ function parseInputText() {
 }
 
 /* ==========================================================
-   2) Geocoder (OpenCage)
-   ========================================================== */
-async function geocode(address) {
-  const key = window.GEOCODER?.key;
-  if (!key) throw new Error("Falta window.GEOCODER.key");
-  const url =
-    "https://api.opencagedata.com/geocode/v1/json?no_annotations=1&language=es&limit=1&q=" +
-    encodeURIComponent(address) +
-    "&key=" +
-    encodeURIComponent(key);
-  const r = await fetch(url);
-  if (!r.ok) throw new Error("Geocoder HTTP " + r.status);
-  const j = await r.json();
-  const it = j.results?.[0];
-  if (!it) return null;
-  const { lat, lng } = it.geometry;
-  const prec = it.confidence ?? 0;
-  return { lat: Number(lat), lng: Number(lng), prec };
-}
-
-/* ==========================================================
-   3) Render de tabla (Puntos detectados)
+   Render de tabla
    ========================================================== */
 function renderTable() {
   if (!inputTableWrap || !inputTable) return;
@@ -124,7 +120,7 @@ function renderTable() {
   <td class="py-3 px-4">${i + 1}</td>
   <td class="py-3 px-4">
     <input data-k="name" data-i="${i}" value="${nameVal}"
-      class="w-full px-3 py-2 rounded-md border border-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-500"/>
+      class="w-full px-4 py-3 text-[15px] font-medium rounded-md border border-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-500"/>
   </td>
   <td class="py-3 px-4 w-full">
     <input data-k="address" data-i="${i}" value="${addrVal}"
@@ -149,7 +145,6 @@ function renderTable() {
     })
     .join("");
 
-  // bind cambios
   inputTable.querySelectorAll("input[data-k]").forEach((el) => {
     el.addEventListener("change", () => {
       const i = Number(el.dataset.i);
@@ -162,20 +157,46 @@ function renderTable() {
 }
 
 /* ==========================================================
-   4) Resultados + Cronograma
+   Cronograma
    ========================================================== */
-function setStatus(msg) {
-  if (statusEl) statusEl.textContent = msg;
-}
-function renderResultsSummary({ stops, km, min }) {
-  if (!resultsEl) return;
-  const head = `
-    <div>Paradas: <strong>${stops}</strong></div>
-    <div>Distancia estimada: <strong>${fmt(km, 1)} km</strong></div>
-    <div>Duración total: <strong>${fmt(min, 0)} min</strong></div>
-  `;
-  const sched = renderScheduleTable(state.schedule || []);
-  resultsEl.innerHTML = head + (sched ? `<div class="mt-3">${sched}</div>` : "");
+function buildSchedule(rowsInOrder) {
+  const speed = Number(avgSpeedEl?.value || 40) || 40;
+  const defaultDwell = Number(defaultDwellEl?.value || 10) || 10;
+  let nowMin = timeStrToMin(startTimeEl?.value) ?? 8 * 60;
+
+  return rowsInOrder.map((row, i) => {
+    let travelMin = 0;
+    if (i > 0) {
+      const prev = rowsInOrder[i - 1];
+      travelMin = (haversine(prev, row) / Math.max(1, speed)) * 60;
+    }
+    let arrive = nowMin + travelMin;
+
+    const openMin = timeStrToMin(row.open);
+    const closeMin = timeStrToMin(row.close);
+    let waitMin = 0;
+    if (openMin != null && arrive < openMin) {
+      waitMin = openMin - arrive;
+      arrive = openMin;
+    }
+
+    let dwell = Number(row.dwell ?? defaultDwell) || defaultDwell;
+    let depart = arrive + dwell;
+    if (closeMin != null && depart > closeMin && enforceWindowsEl?.checked) {
+      depart = closeMin;
+    }
+
+    nowMin = depart;
+    return {
+      idx: i + 1,
+      name: row.name || "",
+      address: row.address,
+      travelMin: Math.round(travelMin),
+      arrive: Math.round(arrive),
+      waitMin: Math.round(waitMin),
+      depart: Math.round(depart),
+    };
+  });
 }
 function renderScheduleTable(schedule) {
   if (!schedule?.length) return "";
@@ -211,256 +232,79 @@ function renderScheduleTable(schedule) {
       </table>
     </div>`;
 }
-
-/* ==========================================================
-   5) Optimización simple (Nearest Neighbor)
-   ========================================================== */
-function nearestNeighbor(points, startIdx = 0, circular = false) {
-  const n = points.length;
-  if (n <= 1) return [...Array(n).keys()];
-  const used = new Array(n).fill(false);
-  const order = [];
-  let cur = startIdx;
-  order.push(cur);
-  used[cur] = true;
-  for (let step = 1; step < n; step++) {
-    let best = -1,
-      bestD = 1e9;
-    for (let j = 0; j < n; j++) {
-      if (used[j]) continue;
-      const d = haversine(points[cur], points[j]);
-      if (d < bestD) {
-        bestD = d;
-        best = j;
-      }
-    }
-    cur = best;
-    used[cur] = true;
-    order.push(cur);
-  }
-  if (circular) order.push(order[0]);
-  return order;
-}
-function calcDistanceAndTime(order, pts, speedKmh, dwellMin) {
-  let km = 0,
-    min = 0;
-  for (let i = 0; i < order.length - 1; i++) {
-    const a = pts[order[i]],
-      b = pts[order[i + 1]];
-    const d = haversine(a, b);
-    km += d;
-    min += (d / Math.max(1, speedKmh)) * 60;
-    min += dwellMin;
-  }
-  if (order.length) min += dwellMin;
-  return { km, min };
+function renderResultsSummary({ stops, km, min }) {
+  if (!resultsEl) return;
+  const head = `
+    <div>Paradas: <strong>${stops}</strong></div>
+    <div>Distancia estimada: <strong>${fmt(km, 1)} km</strong></div>
+    <div>Duración total: <strong>${fmt(min, 0)} min</strong></div>
+  `;
+  const sched = renderScheduleTable(state.schedule || []);
+  resultsEl.innerHTML = head + (sched ? `<div class="mt-3">${sched}</div>` : "");
 }
 
 /* ==========================================================
-   6) Cronograma (con ventanas simples)
+   Flujo principal
    ========================================================== */
-function buildSchedule(rowsInOrder) {
-  const speed = Number(avgSpeedEl?.value || 40) || 40;
-  const defaultDwell = Number(defaultDwellEl?.value || 10) || 10;
-  let nowMin = timeStrToMin(startTimeEl?.value) ?? 8 * 60;
-
-  const sched = [];
-  for (let i = 0; i < rowsInOrder.length; i++) {
-    let travelMin = 0;
-    if (i > 0) {
-      const prev = rowsInOrder[i - 1],
-        cur = rowsInOrder[i];
-      travelMin = (haversine(prev, cur) / Math.max(1, speed)) * 60;
-    }
-    let arrive = nowMin + travelMin;
-
-    const openMin = timeStrToMin(rowsInOrder[i].open);
-    const closeMin = timeStrToMin(rowsInOrder[i].close);
-    let waitMin = 0;
-    if (openMin != null && arrive < openMin) {
-      waitMin = openMin - arrive;
-      arrive = openMin;
-    }
-
-    let dwell = Number(rowsInOrder[i].dwell ?? defaultDwell) || defaultDwell;
-    let depart = arrive + dwell;
-
-    if (closeMin != null && depart > closeMin && enforceWindowsEl?.checked) {
-      // si no cabe dentro de ventana, igual marcamos tope
-      depart = closeMin;
-    }
-
-    sched.push({
-      idx: i + 1,
-      name: rowsInOrder[i].name || "",
-      address:
-        rowsInOrder[i].address ||
-        `${rowsInOrder[i].lat},${rowsInOrder[i].lng}`,
-      travelMin: Math.round(travelMin),
-      arrive: Math.round(arrive),
-      waitMin: Math.round(waitMin),
-      depart: Math.round(depart),
-    });
-
-    nowMin = depart;
-  }
-  return sched;
-}
-
-/* ==========================================================
-   7) Google Maps helpers (enlaces por tramo + publicación)
-   ========================================================== */
-function publishToGMaps(rowsInOrder) {
-  const pts = (rowsInOrder || []).map((r) =>
-    r.address ? { address: r.address } : { lat: r.lat, lng: r.lng }
-  );
-  if (typeof window.setOptimizedPoints === "function")
-    window.setOptimizedPoints(pts);
-  else window._optimizedPoints = pts;
-}
-function renderDirLinks(rowsInOrder = []) {
-  if (!dirLinksEl) return;
-  if (!rowsInOrder.length) {
-    dirLinksEl.innerHTML = `<p class="text-slate-700">Sin tramos aún.</p>`;
-    return;
-  }
-  const items = [];
-  for (let i = 0; i < rowsInOrder.length - 1; i++) {
-    const A = rowsInOrder[i],
-      B = rowsInOrder[i + 1];
-    const o = A.address || `${A.lat},${A.lng}`;
-    const d = B.address || `${B.lat},${B.lng}`;
-    const url =
-      "https://www.google.com/maps/dir/?api=1&origin=" +
-      encodeURIComponent(o) +
-      "&destination=" +
-      encodeURIComponent(d);
-    items.push(
-      `<a class="underline text-sky-800" target="_blank" href="${url}">Tramo ${
-        i + 1
-      }</a>`
-    );
-  }
-  dirLinksEl.innerHTML = `<div class="flex flex-wrap gap-2">${items.join(
-    ""
-  )}</div>`;
-}
-
-/* ==========================================================
-   8) Flujo principal
-   ========================================================== */
-async function updateFromText({ optimize = false } = {}) {
+async function updateFromText() {
   try {
-    setStatus("Procesando entradas…");
-
-    // 1) Parse
     state.rawRows = parseInputText();
     if (!state.rawRows.length) {
       renderTable();
-      setStatus("Pegá direcciones y volvé a intentar.");
-      resultsEl &&
-        (resultsEl.innerHTML = `<p class="text-slate-700">Aún sin resultados.</p>`);
+      resultsEl.innerHTML = `<p class="text-slate-700">Aún sin resultados.</p>`;
       return;
     }
 
-    // 2) Geocodificar todas las filas sin lat/lng
-    for (let i = 0; i < state.rawRows.length; i++) {
-      const r = state.rawRows[i];
-      if (r.lat == null || r.lng == null) {
+    // Geocodificar
+    for (let r of state.rawRows) {
+      if (!r.lat || !r.lng) {
         const g = await geocode(r.address);
         if (g) Object.assign(r, g);
+        await sleep(40);
       }
-      setStatus(`Geocodificando (${i + 1}/${state.rawRows.length})…`);
-      await sleep(40);
     }
 
     renderTable();
 
-    // 3) Orden base
-    let rowsInOrder = [...state.rawRows];
-    if (optimize) {
-      const pts = rowsInOrder.map((r) => ({ lat: r.lat, lng: r.lng }));
-      const order = nearestNeighbor(pts, 0, circularEl?.checked);
-      state.orderedIdx = order;
-      rowsInOrder = order.map((i) => state.rawRows[i]);
-    } else {
-      state.orderedIdx = [];
+    // Cronograma
+    state.schedule = buildSchedule(state.rawRows);
+    state.totalKm = 0;
+    for (let i = 0; i < state.rawRows.length - 1; i++) {
+      state.totalKm += haversine(state.rawRows[i], state.rawRows[i + 1]);
     }
+    state.totalMin = state.schedule.at(-1)?.depart ?? 0;
 
-    // 4) Distancia/tiempo total (aprox por velocidad)
-    const speed = Number(avgSpeedEl?.value || 40) || 40;
-    const dwell = Number(defaultDwellEl?.value || 10) || 10;
-    const orderIdx = state.orderedIdx.length
-      ? state.orderedIdx
-      : rowsInOrder.map((_, i) => i);
-    const pts = rowsInOrder.map((r) => ({ lat: r.lat, lng: r.lng }));
-    const { km, min } = calcDistanceAndTime(orderIdx, pts, speed, dwell);
-    state.totalKm = km;
-    state.totalMin = min;
-
-    // 5) Cronograma
-    state.schedule = buildSchedule(rowsInOrder);
-
-    // 6) Publicar integraciones y mostrar resultados
-    publishToGMaps(rowsInOrder);
-    renderDirLinks(rowsInOrder);
-    renderResultsSummary({ stops: rowsInOrder.length, km, min });
-    setStatus(optimize ? "Ruta optimizada." : "Listo. Podés optimizar cuando quieras.");
+    renderResultsSummary({
+      stops: state.rawRows.length,
+      km: state.totalKm,
+      min: state.totalMin,
+    });
   } catch (e) {
     console.error(e);
-    setStatus("Error: " + (e.message || e));
   }
 }
 
 /* ==========================================================
-   9) Acciones UI
+   Acciones UI
    ========================================================== */
-$("#oneClick")?.addEventListener("click", () =>
-  updateFromText({ optimize: true })
-);
-$("#updateBtn")?.addEventListener("click", () =>
-  updateFromText({ optimize: false })
-);
+$("#updateBtn")?.addEventListener("click", () => updateFromText());
+$("#oneClick")?.addEventListener("click", () => updateFromText());
 $("#clearBtn")?.addEventListener("click", () => {
   if (linksTA) linksTA.value = "";
   state.rawRows = [];
-  state.orderedIdx = [];
   state.schedule = [];
   renderTable();
-  setStatus("Entradas limpiadas.");
-  resultsEl &&
-    (resultsEl.innerHTML = `<p class="text-slate-700">Aún sin resultados.</p>`);
-  dirLinksEl &&
-    (dirLinksEl.innerHTML = `<p>Se generan links a Google Maps por tramos.</p>`);
+  resultsEl.innerHTML = `<p class="text-slate-700">Aún sin resultados.</p>`;
 });
-
-/* Copiar orden */
 $("#copyOrder")?.addEventListener("click", async () => {
-  try {
-    const rows =
-      state.orderedIdx.length > 0
-        ? state.orderedIdx.map((i) => state.rawRows[i])
-        : state.rawRows;
-    if (!rows.length) return alert("Primero cargá direcciones.");
-    const txt = rows
-      .map(
-        (r, i) => `${i + 1}. ${r.name ? r.name + " | " : ""}${r.address || ""}`
-      )
-      .join("\n");
-    await navigator.clipboard.writeText(txt);
-    setStatus("Orden copiado al portapapeles.");
-  } catch (e) {
-    setStatus("No se pudo copiar: " + (e.message || e));
-  }
+  if (!state.rawRows.length) return alert("Primero cargá direcciones.");
+  const txt = state.rawRows
+    .map((r, i) => `${i + 1}. ${r.name ? r.name + " | " : ""}${r.address || ""}`)
+    .join("\n");
+  await navigator.clipboard.writeText(txt);
 });
-
-/* Export CSV */
 $("#exportCsv")?.addEventListener("click", () => {
-  const rows =
-    state.orderedIdx.length > 0
-      ? state.orderedIdx.map((i) => state.rawRows[i])
-      : state.rawRows;
-  if (!rows.length) return alert("Primero cargá direcciones.");
+  if (!state.rawRows.length) return alert("Primero cargá direcciones.");
   const head = [
     "orden",
     "local",
@@ -472,7 +316,7 @@ $("#exportCsv")?.addEventListener("click", () => {
     "abre",
     "cierra",
   ];
-  const csvRows = rows.map((r, idx) => [
+  const csvRows = state.rawRows.map((r, idx) => [
     idx + 1,
     r.name || "",
     r.address || "",
@@ -487,9 +331,7 @@ $("#exportCsv")?.addEventListener("click", () => {
     head.join(",") +
     "\n" +
     csvRows
-      .map((r) =>
-        r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")
-      )
+      .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))
       .join("\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -499,24 +341,19 @@ $("#exportCsv")?.addEventListener("click", () => {
   a.click();
   URL.revokeObjectURL(url);
 });
-
-/* Descargar PDF del cronograma (si existe el botón en tu index) */
+/* Descargar PDF del cronograma */
 $("#downloadPdf")?.addEventListener("click", () => {
-  const rows =
-    state.orderedIdx.length > 0
-      ? state.orderedIdx.map((i) => state.rawRows[i])
-      : state.rawRows;
-  if (!rows.length) return alert("Primero cargá direcciones.");
-
+  if (!state.rawRows.length) return alert("Primero cargá direcciones.");
   const schedule = state.schedule?.length
     ? state.schedule
-    : buildSchedule(rows);
-
+    : buildSchedule(state.rawRows);
   const totals = { km: state.totalKm || 0, min: state.totalMin || 0 };
   openSchedulePrint(schedule, totals);
 });
 
-/* Ventana imprimible del cronograma */
+/* ==========================================================
+   Export PDF
+   ========================================================== */
 function openSchedulePrint(schedule, totals) {
   const win = window.open("", "_blank", "noopener,noreferrer");
   const rows = schedule
@@ -526,8 +363,8 @@ function openSchedulePrint(schedule, totals) {
       <td>${s.idx}</td>
       <td>${s.name ? s.name : "-"}</td>
       <td>${s.address}</td>
-      <td style="white-space:nowrap">${minToTimeStr(s.arrive)}</td>
-      <td style="white-space:nowrap">${minToTimeStr(s.depart)}</td>
+      <td>${minToTimeStr(s.arrive)}</td>
+      <td>${minToTimeStr(s.depart)}</td>
       <td>${s.travelMin} min</td>
       <td>${s.waitMin} min</td>
     </tr>`
@@ -539,7 +376,7 @@ function openSchedulePrint(schedule, totals) {
 <title>Cronograma</title>
 <link href="https://fonts.googleapis.com/css2?family=Questrial&display=swap" rel="stylesheet">
 <style>
-  body{font-family:'Questrial', system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; color:#0f172a;}
+  body{font-family:'Questrial', sans-serif; color:#0f172a;}
   .print-container{padding:24px;}
   .print-title{font-size:20px;font-weight:700;margin-bottom:8px;}
   .print-sub{color:#475569;margin-bottom:16px;}
@@ -551,7 +388,10 @@ function openSchedulePrint(schedule, totals) {
 <body>
   <div class="print-container">
     <div class="print-title">Cronograma</div>
-    <div class="print-sub">Paradas: ${schedule.length} · Distancia estimada: ${fmt(totals.km,1)} km · Duración: ${fmt(totals.min,0)} min</div>
+    <div class="print-sub">Paradas: ${schedule.length} · Distancia: ${fmt(
+    totals.km,
+    1
+  )} km · Duración: ${fmt(totals.min, 0)} min</div>
     <table class="print-table">
       <thead><tr>
         <th>#</th><th>Local</th><th>Dirección</th>
@@ -564,8 +404,3 @@ function openSchedulePrint(schedule, totals) {
 </body></html>`);
   win.document.close();
 }
-
-/* ==========================================================
-   10) Arranque
-   ========================================================== */
-setStatus("Listo para usar. Pegá direcciones y optimizá 🚀");
