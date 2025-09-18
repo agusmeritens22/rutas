@@ -1,7 +1,11 @@
 /* ==========================================================
-   SOLGISTICA · app.js (integrado + Estado + Enlaces robustos + Ruta circular + Guardar/Cargar rutas)
-   - Base: flujo original con estado en tiempo real, enlaces por tramo y ruta completa (chunk ≤10), circular
-   - NUEVO: Guardar/Cargar/Borrar/Exportar rutas en localStorage (con fallbacks y mensajes claros)
+   SOLGISTICA · app.js (FINAL)
+   - Estado en tiempo real
+   - Enlaces robustos (tramos validados + ruta completa en chunks ≤10)
+   - Ruta circular (duplica el primer punto al final cuando está marcado)
+   - Guardar / Cargar / Borrar / Exportar rutas (localStorage)
+   - Panel "Rutas guardadas" con IDs: routeName, saveNamed, updateNamed, syncNow,
+     savedSelect, loadNamed, renameNamed, deleteNamed, exportNamed, importNamed
    ========================================================== */
 
 (function(){
@@ -365,58 +369,147 @@
     a.href = url; a.download = `${name}.json`; a.click();
     URL.revokeObjectURL(url);
   }
-
-  /* ====== UI: Guardar / Cargar / Borrar / Exportar ====== */
-  const routeNameEl      = $("#routeName");
-  const saveRouteBtn     = $("#saveRouteBtn");
-  const routesListEl     = $("#routesList");
-  const refreshRoutesBtn = $("#refreshRoutesBtn");
-  const loadRouteBtn     = $("#loadRouteBtn");
-  const deleteRouteBtn   = $("#deleteRouteBtn");
-  const exportRouteBtn   = "#exportRouteBtn";
-
-  function refreshRoutesList(){
-    if(!routesListEl) return;
-    const items = listRoutes();
-    const current = routesListEl.value;
-    routesListEl.innerHTML = `<option value="">— Rutas guardadas —</option>` +
-      items.map(it => `<option value="${it.name}">${it.name}</option>`).join("");
-    if (current && items.find(x=>x.name===current)) routesListEl.value = current;
+  function renameRoute(oldName, newName){
+    if(!newName || !newName.trim()) throw new Error("Poné un nombre nuevo.");
+    const all = readAllRoutes();
+    if(!all[oldName]) throw new Error("La ruta original no existe.");
+    const payload = all[oldName];
+    payload.name = newName.trim();
+    delete all[oldName];
+    all[payload.name] = payload;     // si existe, lo pisa
+    writeAllRoutes(all);
+    return payload.name;
+  }
+  async function importRouteJSONFile(file){
+    const text = await file.text();
+    const data = JSON.parse(text);
+    const all = readAllRoutes();
+    if (data && data.name && data.rows) {
+      all[data.name] = data;
+    } else if (data && typeof data === "object") {
+      Object.keys(data).forEach(k=>{
+        const it = data[k];
+        if (it && it.name && it.rows) all[it.name] = it;
+      });
+    } else {
+      throw new Error("Formato de JSON no reconocido.");
+    }
+    writeAllRoutes(all);
+  }
+  function updateExistingRoute(name){
+    if(!name) throw new Error("Elegí una ruta para actualizar.");
+    if(!state?.rawRows?.length) throw new Error("No hay datos actuales para guardar.");
+    const all = readAllRoutes();
+    if(!all[name]) throw new Error("Esa ruta no existe.");
+    all[name] = {
+      ...all[name],
+      rows: state.rawRows,
+      schedule: state.schedule,
+      totals: { km: state.totalKm, min: state.totalMin },
+      updatedAt: new Date().toISOString(),
+    };
+    writeAllRoutes(all);
   }
 
-  saveRouteBtn?.addEventListener("click", ()=>{
+  /* ====== Wire-up para panel "Rutas guardadas" (tus IDs) ====== */
+  const routeNameInp = $("#routeName");
+  const saveNamedBtn = $("#saveNamed");
+  const updateNamedBtn = $("#updateNamed");
+  const syncNowBtn    = $("#syncNow");
+  const savedSelect   = $("#savedSelect");
+  const loadNamedBtn  = $("#loadNamed");
+  const renameNamedBtn= $("#renameNamed");
+  const deleteNamedBtn= $("#deleteNamed");
+  const exportNamedBtn= $("#exportNamed");
+  const importNamedInp= $("#importNamed");
+
+  function refreshSavedSelect(){
+    if(!savedSelect) return;
+    const items = listRoutes();
+    const current = savedSelect.value;
+    savedSelect.innerHTML = `<option value="">— Rutas guardadas —</option>` +
+      items.map(it => `<option value="${it.name}">${it.name}</option>`).join("");
+    if (current && items.find(x=>x.name===current)) savedSelect.value = current;
+  }
+
+  saveNamedBtn?.addEventListener("click", ()=>{
     try{
-      if(!LS) return alert("No puedo guardar: localStorage deshabilitado por el navegador.");
-      const name = routeNameEl?.value || "";
-      const savedName = saveCurrentRoute(name);
-      refreshRoutesList();
-      if (routesListEl) routesListEl.value = savedName;
+      if(!LS) return alert("localStorage deshabilitado por el navegador.");
+      const name = routeNameInp?.value || "";
+      const saved = saveCurrentRoute(name);
+      refreshSavedSelect();
+      if (savedSelect) savedSelect.value = saved;
       alert("Ruta guardada ✅");
-    }catch(e){ alert(e.message || "No se pudo guardar la ruta."); }
+    }catch(e){ alert(e.message || "No se pudo guardar."); }
   });
-  refreshRoutesBtn?.addEventListener("click", refreshRoutesList);
-  loadRouteBtn?.addEventListener("click", ()=>{
+
+  updateNamedBtn?.addEventListener("click", ()=>{
     try{
-      const name = routesListEl?.value || "";
+      const name = savedSelect?.value || "";
+      updateExistingRoute(name);
+      alert("Ruta actualizada ✅");
+    }catch(e){ alert(e.message || "No se pudo actualizar."); }
+  });
+
+  syncNowBtn?.addEventListener("click", ()=>{
+    try{
+      const all = readAllRoutes();
+      writeAllRoutes(all);
+      refreshSavedSelect();
+      alert("Sincronizado local ✅");
+    }catch(e){ alert(e.message || "No se pudo sincronizar."); }
+  });
+
+  loadNamedBtn?.addEventListener("click", ()=>{
+    try{
+      const name = savedSelect?.value || "";
       loadRouteByName(name);
+      if (routeNameInp && name) routeNameInp.value = name;
       alert("Ruta cargada ✅");
-    }catch(e){ alert(e.message || "No se pudo cargar la ruta."); }
+    }catch(e){ alert(e.message || "No se pudo cargar."); }
   });
-  deleteRouteBtn?.addEventListener("click", ()=>{
+
+  renameNamedBtn?.addEventListener("click", ()=>{
     try{
-      const name = routesListEl?.value || "";
-      if (!name) return alert("Elegí una ruta para borrar.");
-      if (!confirm(`¿Borrar la ruta "${name}"?`)) return;
+      const oldName = savedSelect?.value || "";
+      if(!oldName) return alert("Elegí una ruta para renombrar.");
+      const newName = prompt(`Nuevo nombre para "${oldName}":`, oldName);
+      if(!newName || !newName.trim()) return;
+      const saved = renameRoute(oldName, newName.trim());
+      refreshSavedSelect();
+      savedSelect.value = saved;
+      if (routeNameInp) routeNameInp.value = saved;
+      alert("Ruta renombrada ✅");
+    }catch(e){ alert(e.message || "No se pudo renombrar."); }
+  });
+
+  deleteNamedBtn?.addEventListener("click", ()=>{
+    try{
+      const name = savedSelect?.value || "";
+      if(!name) return alert("Elegí una ruta para borrar.");
+      if(!confirm(`¿Borrar la ruta "${name}"?`)) return;
       deleteRouteByName(name);
-      refreshRoutesList();
+      refreshSavedSelect();
       alert("Ruta borrada 🗑️");
-    }catch(e){ alert(e.message || "No se pudo borrar la ruta."); }
+    }catch(e){ alert(e.message || "No se pudo borrar."); }
   });
-  document.querySelector(exportRouteBtn)?.addEventListener("click", ()=>{
+
+  exportNamedBtn?.addEventListener("click", ()=>{
     try{
-      const name = routesListEl?.value || "";
+      const name = savedSelect?.value || "";
       exportRouteJSON(name);
-    }catch(e){ alert(e.message || "No se pudo exportar la ruta."); }
+    }catch(e){ alert(e.message || "No se pudo exportar."); }
+  });
+
+  importNamedInp?.addEventListener("change", async ()=>{
+    try{
+      const file = importNamedInp.files?.[0];
+      if(!file) return;
+      await importRouteJSONFile(file);
+      refreshSavedSelect();
+      importNamedInp.value = ""; // limpia el input
+      alert("Ruta(s) importada(s) ✅");
+    }catch(e){ alert(e.message || "No se pudo importar."); }
   });
 
   /* ==========================================================
@@ -539,7 +632,7 @@
     }
   });
 
-  // Estado inicial + llenar combo de rutas si existe
+  // Estado inicial + llenar combos si existen
   setStatus("Esperando entradas…");
-  (function initRoutesCombo(){ try{ const x=listRoutes(); if (x.length) { const el = $("#routesList"); if (el) { el.innerHTML = `<option value="">— Rutas guardadas —</option>` + x.map(it=>`<option value="${it.name}">${it.name}</option>`).join(""); } } }catch(_){} })();
+  (function initSavedCombo(){ try{ refreshSavedSelect(); }catch(_){} })();
 })();
