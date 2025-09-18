@@ -144,33 +144,32 @@
           </div>
         </div>
 
-        <!-- Tabla editable -->
-        <div id="inputTableWrap" class="card hidden">
-          <h2 class="text-lg font-semibold mb-3">Puntos detectados</h2>
-          <div class="overflow-x-auto">
-            <table class="table-auto w-full text-sm bg-white rounded-xl">
-           <thead>
-  <tr class="text-left text-slate-600">
-    <th class="py-3 px-4">#</th>
-    <th class="py-3 px-4">Local</th>
-    <th class="py-3 px-4 w-full">Dirección</th>
-    <th class="py-3 px-4">Lat</th>
-    <th class="py-3 px-4">Lng</th>
-    <th class="py-3 px-4">Precisión</th>
-    <th class="py-3 px-4">Estadía</th>
-    <th class="py-3 px-4">Abre</th>
-    <th class="py-3 px-4">Cierra</th>
-  </tr>
-</thead>
+    <!-- Tabla editable -->
+<div id="inputTableWrap" class="bg-white rounded-2xl shadow p-4 sm:p-5 hidden">
+  <h2 class="text-lg font-semibold mb-3">Puntos detectados</h2>
+  <div class="overflow-x-auto">
+    <table class="table-auto w-full text-sm bg-white rounded-xl">
+      <thead>
+        <tr class="text-left text-slate-600">
+          <th class="py-3 px-4">#</th>
+          <th class="py-3 px-4">Local</th>
+          <th class="py-3 px-4 w-full">Dirección</th>
+          <th class="py-3 px-4">Lat</th>
+          <th class="py-3 px-4">Lng</th>
+          <th class="py-3 px-4">Precisión</th>
+          <th class="py-3 px-4">Estadía</th>
+          <th class="py-3 px-4">Abre</th>
+          <th class="py-3 px-4">Cierra</th>
+        </tr>
+      </thead>
+      <tbody id="inputTable"></tbody>
+    </table>
+  </div>
+  <div class="mt-3 text-xs text-slate-500">
+    Podés editar <strong>Local</strong>, <strong>Abre/Cierra</strong> y <strong>Estadía</strong>. El cronograma usa estos valores.
+  </div>
+</div>
 
-              <tbody id="inputTable"></tbody>
-            </table>
-          </div>
-          <div class="mt-3 text-xs text-slate-700">
-            Podés editar <strong>Local</strong>, <strong>Abre/Cierra</strong> y <strong>Estadía</strong>. El cronograma usa estos valores.
-          </div>
-        </div>
-      </div>
 
       <!-- Columna derecha: estado, guardar/cargar, links -->
       <aside class="xl:col-span-1 space-y-6">
