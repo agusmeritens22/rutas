@@ -1,5 +1,5 @@
 /* ==========================================================
-   SOLGISTICA · app.js (auto-geocodificación + cronograma + descarga directa)
+   SOLGISTICA · app.js (con PDF export y sin Google Maps)
    ========================================================== */
 
 const $ = (sel) => document.querySelector(sel);
@@ -24,7 +24,9 @@ function timeStrToMin(t) {
 }
 function minToTimeStr(m) {
   m = Math.max(0, Math.round(m));
-  const h = Math.floor(m / 60).toString().padStart(2, "0");
+  const h = Math.floor(m / 60)
+    .toString()
+    .padStart(2, "0");
   const mm = (m % 60).toString().padStart(2, "0");
   return `${h}:${mm}`;
 }
@@ -46,14 +48,34 @@ const enforceWindowsEl = $("#enforceWindows");
 
 /* ---------- Estado ---------- */
 const state = {
-  rawRows: [],      // [{name,address,lat,lng,prec,dwell,open,close}]
-  schedule: [],     // [{idx,name,address,arrive,depart,travelMin,waitMin}]
+  rawRows: [],
+  orderedIdx: [],
+  schedule: [],
   totalKm: 0,
   totalMin: 0,
 };
 
 /* ==========================================================
-   1) Parseo de textarea
+   Geocoder (OpenCage)
+   ========================================================== */
+async function geocode(address) {
+  const key = window.GEOCODER?.key;
+  const url =
+    "https://api.opencagedata.com/geocode/v1/json?no_annotations=1&language=es&limit=1&q=" +
+    encodeURIComponent(address) +
+    "&key=" +
+    encodeURIComponent(key);
+  const r = await fetch(url);
+  const j = await r.json();
+  const it = j.results?.[0];
+  if (!it) return null;
+  const { lat, lng } = it.geometry;
+  const prec = it.confidence ?? 0;
+  return { lat: Number(lat), lng: Number(lng), prec };
+}
+
+/* ==========================================================
+   Parseo de textarea
    ========================================================== */
 function parseInputText() {
   const lines = (linksTA?.value || "")
@@ -74,28 +96,7 @@ function parseInputText() {
 }
 
 /* ==========================================================
-   2) Geocoder (OpenCage)
-   ========================================================== */
-async function geocode(address) {
-  const key = window.GEOCODER?.key;
-  if (!key) throw new Error("Falta window.GEOCODER.key");
-  const url =
-    "https://api.opencagedata.com/geocode/v1/json?no_annotations=1&language=es&limit=1&q=" +
-    encodeURIComponent(address) +
-    "&key=" +
-    encodeURIComponent(key);
-  const r = await fetch(url);
-  if (!r.ok) throw new Error("Geocoder HTTP " + r.status);
-  const j = await r.json();
-  const it = j.results?.[0];
-  if (!it) return null;
-  const { lat, lng } = it.geometry;
-  const prec = it.confidence ?? 0;
-  return { lat: Number(lat), lng: Number(lng), prec };
-}
-
-/* ==========================================================
-   3) Render de tabla (Puntos detectados)
+   Render de tabla
    ========================================================== */
 function renderTable() {
   if (!inputTableWrap || !inputTable) return;
@@ -156,7 +157,7 @@ function renderTable() {
 }
 
 /* ==========================================================
-   4) Cronograma
+   Cronograma
    ========================================================== */
 function buildSchedule(rowsInOrder) {
   const speed = Number(avgSpeedEl?.value || 40) || 40;
@@ -199,16 +200,20 @@ function buildSchedule(rowsInOrder) {
 }
 function renderScheduleTable(schedule) {
   if (!schedule?.length) return "";
-  const rows = schedule.map(s => `
-    <tr>
-      <td class="py-2 px-2">${s.idx}</td>
-      <td class="py-2 px-2">${s.name || "-"}</td>
-      <td class="py-2 px-2">${s.address}</td>
-      <td class="py-2 px-2 whitespace-nowrap">${minToTimeStr(s.arrive)}</td>
-      <td class="py-2 px-2 whitespace-nowrap">${minToTimeStr(s.depart)}</td>
-      <td class="py-2 px-2">${s.travelMin} min</td>
-      <td class="py-2 px-2">${s.waitMin} min</td>
-    </tr>`).join("");
+  const rows = schedule
+    .map(
+      (s) => `
+      <tr>
+        <td class="py-2 px-2">${s.idx}</td>
+        <td class="py-2 px-2">${s.name || "-"}</td>
+        <td class="py-2 px-2">${s.address}</td>
+        <td class="py-2 px-2 whitespace-nowrap">${minToTimeStr(s.arrive)}</td>
+        <td class="py-2 px-2 whitespace-nowrap">${minToTimeStr(s.depart)}</td>
+        <td class="py-2 px-2">${s.travelMin} min</td>
+        <td class="py-2 px-2">${s.waitMin} min</td>
+      </tr>`
+    )
+    .join("");
   return `
     <div class="rounded-lg border border-slate-200 overflow-hidden">
       <table class="w-full text-xs sm:text-sm">
@@ -239,46 +244,34 @@ function renderResultsSummary({ stops, km, min }) {
 }
 
 /* ==========================================================
-   5) Flujo principal
+   Flujo principal
    ========================================================== */
-async function updateFromText({ optimize = false } = {}) {
+async function updateFromText() {
   try {
-    statusEl.textContent = "Procesando…";
-
-    // 1) Parse
     state.rawRows = parseInputText();
     if (!state.rawRows.length) {
       renderTable();
-      resultsEl.innerHTML = `<p class="text-slate-600">Aún sin resultados.</p>`;
-      statusEl.textContent = "Pegá direcciones para comenzar.";
+      resultsEl.innerHTML = `<p class="text-slate-700">Aún sin resultados.</p>`;
       return;
     }
 
-    // 2) Completar defaults de ventanas si faltan
-    for (const r of state.rawRows) {
-      if (!r.open && defaultOpenEl?.value) r.open = defaultOpenEl.value;
-      if (!r.close && defaultCloseEl?.value) r.close = defaultCloseEl.value;
-    }
-
-    // 3) Geocodificar
-    for (let i = 0; i < state.rawRows.length; i++) {
-      const r = state.rawRows[i];
-      if (r.lat == null || r.lng == null) {
+    // Geocodificar
+    for (let r of state.rawRows) {
+      if (!r.lat || !r.lng) {
         const g = await geocode(r.address);
         if (g) Object.assign(r, g);
+        await sleep(40);
       }
-      statusEl.textContent = `Geocodificando (${i + 1}/${state.rawRows.length})…`;
-      await sleep(40);
     }
 
     renderTable();
 
-    // 4) Cronograma + totales
+    // Cronograma
+    state.schedule = buildSchedule(state.rawRows);
     state.totalKm = 0;
     for (let i = 0; i < state.rawRows.length - 1; i++) {
       state.totalKm += haversine(state.rawRows[i], state.rawRows[i + 1]);
     }
-    state.schedule = buildSchedule(state.rawRows);
     state.totalMin = state.schedule.at(-1)?.depart ?? 0;
 
     renderResultsSummary({
@@ -286,26 +279,22 @@ async function updateFromText({ optimize = false } = {}) {
       km: state.totalKm,
       min: state.totalMin,
     });
-
-    statusEl.textContent = optimize ? "Ruta optimizada." : "Listo.";
   } catch (e) {
     console.error(e);
-    statusEl.textContent = "Error: " + (e.message || e);
   }
 }
 
 /* ==========================================================
-   6) Acciones UI
+   Acciones UI
    ========================================================== */
-$("#oneClick")?.addEventListener("click", () => updateFromText({ optimize: true }));
-$("#updateBtn")?.addEventListener("click", () => updateFromText({ optimize: false }));
+$("#updateBtn")?.addEventListener("click", () => updateFromText());
+$("#oneClick")?.addEventListener("click", () => updateFromText());
 $("#clearBtn")?.addEventListener("click", () => {
   if (linksTA) linksTA.value = "";
   state.rawRows = [];
   state.schedule = [];
   renderTable();
-  resultsEl.innerHTML = `<p class="text-slate-600">Aún sin resultados.</p>`;
-  statusEl.textContent = "Entradas limpiadas.";
+  resultsEl.innerHTML = `<p class="text-slate-700">Aún sin resultados.</p>`;
 });
 $("#copyOrder")?.addEventListener("click", async () => {
   if (!state.rawRows.length) return alert("Primero cargá direcciones.");
@@ -313,52 +302,81 @@ $("#copyOrder")?.addEventListener("click", async () => {
     .map((r, i) => `${i + 1}. ${r.name ? r.name + " | " : ""}${r.address || ""}`)
     .join("\n");
   await navigator.clipboard.writeText(txt);
-  statusEl.textContent = "Orden copiado al portapapeles.";
 });
 $("#exportCsv")?.addEventListener("click", () => {
   if (!state.rawRows.length) return alert("Primero cargá direcciones.");
-  const head = ["orden","local","direccion","lat","lng","precision","dwell","abre","cierra"];
+  const head = [
+    "orden",
+    "local",
+    "direccion",
+    "lat",
+    "lng",
+    "precision",
+    "dwell",
+    "abre",
+    "cierra",
+  ];
   const csvRows = state.rawRows.map((r, idx) => [
-    idx + 1, r.name || "", r.address || "", r.lat ?? "", r.lng ?? "",
-    r.prec ?? "", r.dwell ?? "", r.open || "", r.close || ""
+    idx + 1,
+    r.name || "",
+    r.address || "",
+    r.lat ?? "",
+    r.lng ?? "",
+    r.prec ?? "",
+    r.dwell ?? "",
+    r.open || "",
+    r.close || "",
   ]);
   const csv =
-    head.join(",") + "\n" +
-    csvRows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(",")).join("\n");
+    head.join(",") +
+    "\n" +
+    csvRows
+      .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = url; a.download = "ruta.csv"; a.click();
+  a.href = url;
+  a.download = "ruta.csv";
+  a.click();
   URL.revokeObjectURL(url);
+});
+/* Descargar PDF del cronograma */
+$("#downloadPdf")?.addEventListener("click", () => {
+  if (!state.rawRows.length) return alert("Primero cargá direcciones.");
+  const schedule = state.schedule?.length
+    ? state.schedule
+    : buildSchedule(state.rawRows);
+  const totals = { km: state.totalKm || 0, min: state.totalMin || 0 };
+  openSchedulePrint(schedule, totals);
 });
 
 /* ==========================================================
-   7) Descarga directa de “PDF” (HTML imprimible)
+   Export PDF
    ========================================================== */
-$("#downloadPdf")?.addEventListener("click", () => {
-  if (!state.rawRows.length) return alert("Primero cargá direcciones.");
-  const schedule = state.schedule?.length ? state.schedule : buildSchedule(state.rawRows);
-  downloadScheduleHTML(schedule, { km: state.totalKm || 0, min: state.totalMin || 0 });
-});
-
-function downloadScheduleHTML(schedule, totals) {
-  const rows = schedule.map(s => `
+function openSchedulePrint(schedule, totals) {
+  const win = window.open("", "_blank", "noopener,noreferrer");
+  const rows = schedule
+    .map(
+      (s) => `
     <tr>
       <td>${s.idx}</td>
       <td>${s.name ? s.name : "-"}</td>
       <td>${s.address}</td>
-      <td style="white-space:nowrap">${minToTimeStr(s.arrive)}</td>
-      <td style="white-space:nowrap">${minToTimeStr(s.depart)}</td>
+      <td>${minToTimeStr(s.arrive)}</td>
+      <td>${minToTimeStr(s.depart)}</td>
       <td>${s.travelMin} min</td>
       <td>${s.waitMin} min</td>
-    </tr>`).join("");
+    </tr>`
+    )
+    .join("");
 
-  const html = `<!DOCTYPE html>
-<html><head><meta charset="utf-8">
+  win.document.write(`
+<!DOCTYPE html><html><head><meta charset="utf-8">
 <title>Cronograma</title>
 <link href="https://fonts.googleapis.com/css2?family=Questrial&display=swap" rel="stylesheet">
 <style>
-  body{font-family:'Questrial',system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;color:#0f172a;}
+  body{font-family:'Questrial', sans-serif; color:#0f172a;}
   .print-container{padding:24px;}
   .print-title{font-size:20px;font-weight:700;margin-bottom:8px;}
   .print-sub{color:#475569;margin-bottom:16px;}
@@ -370,7 +388,10 @@ function downloadScheduleHTML(schedule, totals) {
 <body>
   <div class="print-container">
     <div class="print-title">Cronograma</div>
-    <div class="print-sub">Paradas: ${schedule.length} · Distancia: ${fmt(totals.km,1)} km · Duración: ${fmt(totals.min,0)} min</div>
+    <div class="print-sub">Paradas: ${schedule.length} · Distancia: ${fmt(
+    totals.km,
+    1
+  )} km · Duración: ${fmt(totals.min, 0)} min</div>
     <table class="print-table">
       <thead><tr>
         <th>#</th><th>Local</th><th>Dirección</th>
@@ -380,20 +401,6 @@ function downloadScheduleHTML(schedule, totals) {
     </table>
   </div>
   <script>window.addEventListener('load',()=>window.print());</script>
-</body></html>`;
-
-  const blob = new Blob([html], { type: "text/html" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "cronograma.html";      // Abrís y guardás como PDF
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+</body></html>`);
+  win.document.close();
 }
-
-/* ==========================================================
-   8) Mensaje inicial
-   ========================================================== */
-statusEl.textContent = "Listo para usar. Pegá direcciones y optimizá 🚀";
