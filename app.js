@@ -1,5 +1,5 @@
 /* ==========================================================
-   SOLGISTICA · app.js (con PDF export y sin Google Maps)
+   SOLGISTICA · app.js corregido (final)
    ========================================================== */
 
 const $ = (sel) => document.querySelector(sel);
@@ -35,7 +35,6 @@ function minToTimeStr(m) {
 const linksTA = $("#links");
 const inputTableWrap = $("#inputTableWrap");
 const inputTable = $("#inputTable");
-const statusEl = $("#status");
 const resultsEl = $("#results");
 
 const avgSpeedEl = $("#avgSpeed");
@@ -45,11 +44,12 @@ const defaultOpenEl = $("#defaultOpen");
 const defaultCloseEl = $("#defaultClose");
 const circularEl = $("#circular");
 const enforceWindowsEl = $("#enforceWindows");
+const useGeoEl = $("#useGeo");
+const dirLinksEl = $("#dirLinks");
 
 /* ---------- Estado ---------- */
 const state = {
   rawRows: [],
-  orderedIdx: [],
   schedule: [],
   totalKm: 0,
   totalMin: 0,
@@ -244,6 +244,56 @@ function renderResultsSummary({ stops, km, min }) {
 }
 
 /* ==========================================================
+   Enlaces de navegación (Google Maps)
+   ========================================================== */
+function pointToStr(p){
+  if (p?.address) return p.address;
+  if (p?.lat != null && p?.lng != null) return `${p.lat},${p.lng}`;
+  return '';
+}
+function makeMapsUrl(points){
+  const parts = points.map(pointToStr).filter(Boolean).map(encodeURIComponent);
+  return `https://www.google.com/maps/dir/${parts.join('/')}`;
+}
+function perLegLinks(points){
+  const out = [];
+  for (let i=0;i<points.length-1;i++){
+    const a = points[i], b = points[i+1];
+    const url = makeMapsUrl([a,b]);
+    out.push({i:i+1, from: pointToStr(a), to: pointToStr(b), url});
+  }
+  return out;
+}
+async function getStartGeoIfNeeded(){
+  if (!useGeoEl?.checked) return null;
+  try{
+    const pos = await new Promise((res,rej)=>{
+      navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy:true, timeout:8000 });
+    });
+    return { lat: pos.coords.latitude, lng: pos.coords.longitude, address: null, name: 'Inicio (mi ubicación)' };
+  }catch{ return null; }
+}
+async function updateNavLinksAndAPI(points){
+  if (typeof window.setOptimizedPoints === 'function'){
+    window.setOptimizedPoints(points);
+  }
+  if (!dirLinksEl) return;
+  const fullUrl = makeMapsUrl(points);
+  const legs = perLegLinks(points);
+  dirLinksEl.innerHTML = `
+    <div class="space-y-2">
+      <a href="${fullUrl}" target="_blank" rel="noopener" class="underline text-sky-700">Abrir ruta completa</a>
+      <div class="text-xs text-slate-500">O abrir por tramos:</div>
+      <div class="flex flex-col gap-1">
+        ${legs.map(l => `
+          <a class="text-sm underline text-sky-700" target="_blank" rel="noopener"
+             href="${l.url}">Tramo ${l.i}: ${l.from || '(origen)'} → ${l.to}</a>
+        `).join('')}
+      </div>
+    </div>`;
+}
+
+/* ==========================================================
    Flujo principal
    ========================================================== */
 async function updateFromText() {
@@ -252,6 +302,7 @@ async function updateFromText() {
     if (!state.rawRows.length) {
       renderTable();
       resultsEl.innerHTML = `<p class="text-slate-700">Aún sin resultados.</p>`;
+      if (dirLinksEl) dirLinksEl.innerHTML = `<p>Se generan links a Google Maps por tramos.</p>`;
       return;
     }
 
@@ -279,6 +330,16 @@ async function updateFromText() {
       km: state.totalKm,
       min: state.totalMin,
     });
+
+    // Generar enlaces de navegación
+    let points = state.rawRows.slice();
+    if (circularEl?.checked && points.length > 1){
+      points.push(points[0]); // ruta circular
+    }
+    const startGeo = await getStartGeoIfNeeded();
+    if (startGeo) points = [startGeo, ...points];
+    await updateNavLinksAndAPI(points);
+
   } catch (e) {
     console.error(e);
   }
@@ -295,6 +356,7 @@ $("#clearBtn")?.addEventListener("click", () => {
   state.schedule = [];
   renderTable();
   resultsEl.innerHTML = `<p class="text-slate-700">Aún sin resultados.</p>`;
+  if (dirLinksEl) dirLinksEl.innerHTML = `<p>Se generan links a Google Maps por tramos.</p>`;
 });
 $("#copyOrder")?.addEventListener("click", async () => {
   if (!state.rawRows.length) return alert("Primero cargá direcciones.");
@@ -341,7 +403,6 @@ $("#exportCsv")?.addEventListener("click", () => {
   a.click();
   URL.revokeObjectURL(url);
 });
-/* Descargar PDF del cronograma */
 $("#downloadPdf")?.addEventListener("click", () => {
   if (!state.rawRows.length) return alert("Primero cargá direcciones.");
   const schedule = state.schedule?.length
@@ -352,113 +413,70 @@ $("#downloadPdf")?.addEventListener("click", () => {
 });
 
 /* ==========================================================
-   Export PDF
+   Export PDF con jsPDF + autoTable
    ========================================================== */
-// Reemplazo: genera y DESCARGA el PDF directamente con html2pdf.js
-// PDF "limpio": solo tabla + encabezado repetido por página
 function openSchedulePrint(schedule, totals) {
-  // Aseguramos que haya cronograma armado
-  if ((!schedule || !schedule.length) && state.rawRows?.length) {
-    schedule = (state.schedule && state.schedule.length)
-      ? state.schedule
-      : buildSchedule(state.rawRows);
-  }
   if (!schedule || !schedule.length) {
-    alert('No hay cronograma para exportar. Cargá direcciones y actualizá.');
-    return;
-  }
-  if (!window.html2pdf) {
-    alert('No se encontró html2pdf.js. Incluí el <script> antes de </body>.');
+    alert('No hay cronograma para exportar.');
     return;
   }
 
-  // --- Construimos un DOM minimalista SOLO con datos (sin degradés/temas UI)
-  const wrapper = document.createElement('div');
+  const { jsPDF } = window.jspdf || {};
+  if (!jsPDF) {
+    alert('No se encontró jsPDF. Verificá que el <script> de jsPDF y autoTable estén incluidos en index.html.');
+    return;
+  }
 
-  // Estilos internos para PDF
-  wrapper.innerHTML = `
-    <style>
-      * { box-sizing: border-box; }
-      body, div, table { background: #ffffff !important; }
-      .title { font-family: Arial, Helvetica, sans-serif; font-size: 16px; font-weight: 700; margin-bottom: 6px; color:#0f172a; }
-      .sub   { font-family: Arial, Helvetica, sans-serif; font-size: 11px; color:#334155; margin-bottom: 10px; }
-      table  { width: 100%; border-collapse: collapse; font-family: Arial, Helvetica, sans-serif; font-size: 11px; }
-      th, td { border: 1px solid #e2e8f0; padding: 6px 8px; text-align: left; vertical-align: middle; }
-      th     { background: #f8fafc; color:#0f172a; font-weight: 700; }
-      /* Repetir encabezado y evitar cortes feos */
-      thead { display: table-header-group; }
-      tfoot { display: table-row-group; }
-      tr    { page-break-inside: avoid; }
-    </style>
-  `;
+  const orientation = 'portrait'; // 'landscape' si preferís horizontal
+  const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation });
 
-  const title = document.createElement('div');
-  title.className = 'title';
-  title.textContent = 'Cronograma';
+  const km  = (typeof totals?.km  === 'number') ? totals.km  : (state.totalKm || 0);
+  const min = (typeof totals?.min === 'number') ? totals.min : (state.totalMin || 0);
 
-  const sub = document.createElement('div');
-  sub.className = 'sub';
-  const totalKm  = (typeof totals?.km  === 'number') ? totals.km  : (state.totalKm || 0);
-  const totalMin = (typeof totals?.min === 'number') ? totals.min : (state.totalMin || 0);
-  sub.textContent = `Paradas: ${schedule.length} · Distancia: ${fmt(totalKm,1)} km · Duración: ${fmt(totalMin,0)} min`;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.text('Cronograma', 10, 14);
 
-  const table = document.createElement('table');
-  table.innerHTML = `
-    <thead>
-      <tr>
-        <th style="width:36px">#</th>
-        <th>Local</th>
-        <th>Dirección</th>
-        <th style="width:70px">Llega</th>
-        <th style="width:70px">Sale</th>
-        <th style="width:80px">Traslado</th>
-        <th style="width:70px">Espera</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${schedule.map(s => `
-        <tr>
-          <td>${s.idx}</td>
-          <td>${s.name ? s.name : '-'}</td>
-          <td>${s.address}</td>
-          <td>${minToTimeStr(s.arrive)}</td>
-          <td>${minToTimeStr(s.depart)}</td>
-          <td>${s.travelMin} min</td>
-          <td>${s.waitMin} min</td>
-        </tr>
-      `).join('')}
-    </tbody>
-  `;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.text(`Paradas: ${schedule.length} · Distancia: ${fmt(km,1)} km · Duración: ${fmt(min,0)} min`, 10, 20);
 
-  const holder = document.createElement('div');
-  holder.style.position = 'fixed';
-  holder.style.top = '0';
-  holder.style.left = '0';
-  holder.style.right = '0';
-  holder.style.opacity = '0.01';    // visible para html2canvas, imperceptible
-  holder.style.pointerEvents = 'none';
-  holder.style.background = '#ffffff';
+  const head = [['#','Local','Dirección','Llega','Sale','Traslado','Espera']];
+  const body = schedule.map(s => [
+    String(s.idx),
+    s.name ? s.name : '-',
+    s.address,
+    minToTimeStr(s.arrive),
+    minToTimeStr(s.depart),
+    `${s.travelMin} min`,
+    `${s.waitMin} min`
+  ]);
 
-  holder.appendChild(wrapper);
-  wrapper.appendChild(title);
-  wrapper.appendChild(sub);
-  wrapper.appendChild(table);
-  document.body.appendChild(holder);
+  doc.autoTable({
+    head,
+    body,
+    startY: 26,
+    styles: { font: 'helvetica', fontSize: 9, cellPadding: 2, valign: 'middle' },
+    headStyles: { fillColor: [248, 250, 252], textColor: [15, 23, 42] },
+    bodyStyles: { textColor: [15, 23, 42] },
+    theme: 'grid',
+    pageBreak: 'auto',
+    tableWidth: 'auto',
+    columnStyles: {
+      0: { cellWidth: 10 },
+      3: { cellWidth: 18 },
+      4: { cellWidth: 18 },
+      5: { cellWidth: 24 },
+      6: { cellWidth: 18 },
+    },
+    didDrawPage: (data) => {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      const subtitle = `Paradas: ${schedule.length} · Distancia: ${fmt(km,1)} km · Duración: ${fmt(min,0)} min`;
+      doc.text(subtitle, 10, 20);
+    },
+  });
 
-  const opt = {
-    margin:       10,
-    filename:     'cronograma.pdf',
-    image:        { type: 'jpeg', quality: 0.98 },
-    html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
-    jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }, // cambiá a 'landscape' si preferís
-    pagebreak:    { mode: ['css', 'legacy'] }
-  };
-
-  html2pdf().set(opt).from(holder).save()
-    .then(() => document.body.removeChild(holder))
-    .catch((e) => {
-      console.error(e);
-      document.body.removeChild(holder);
-      alert('No se pudo generar el PDF.');
-    });
+  doc.save('cronograma.pdf');
 }
+
