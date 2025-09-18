@@ -100,7 +100,7 @@
 
           <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
             <label class="text-sm flex items-center gap-2">
-              <input id="autoRun" type="checkbox" class="w-4 h-4 rounded" rounded>
+              <input id="autoRun" type="checkbox" class="w-4 h-4 rounded" checked>
               Auto-geocodificar y optimizar
             </label>
             <div class="flex items-center gap-2">
@@ -124,7 +124,7 @@
               <input id="defaultClose" type="time" class="w-28" placeholder="18:00" />
             </div>
             <label class="text-sm flex items-center gap-2">
-              <input id="useGeo" type="checkbox" class="w-4 h-4 checked">
+              <input id="useGeo" type="checkbox" class="w-4 h-4 rounded">
               Usar mi ubicación como inicio
             </label>
             <label class="text-sm flex items-center gap-2">
@@ -143,8 +143,6 @@
             <button id="clearBtn" class="btn btn-soft">Limpiar</button>
           </div>
         </div>
-
-         
 
         <!-- Tabla editable -->
         <div id="inputTableWrap" class="card hidden">
@@ -175,8 +173,6 @@
 
       <!-- Columna derecha: estado, guardar/cargar, links -->
       <aside class="xl:col-span-1 space-y-6">
-
-        <!-- Estado/Resultados -->
         <div class="card">
           <h3 class="font-semibold mb-2">Estado</h3>
           <div id="status" class="text-xs">Esperando entradas…</div>
@@ -189,11 +185,6 @@
             <!-- NUEVO: abrir ruta en Google Maps -->
             <button id="openInGMaps" class="btn btn-primary">Ver en Google Maps</button>
           </div>
-        </div>
-
-         <div class="card">
-          <h3 class="font-semibold mb-2">Enlaces de navegación</h3>
-          <div id="dirLinks" class="text-sm space-y-2"><p>Se generan links a Google Maps por tramos.</p></div>
         </div>
 
         <div class="card">
@@ -221,7 +212,10 @@
           </div>
         </div>
 
-    
+        <div class="card">
+          <h3 class="font-semibold mb-2">Enlaces de navegación</h3>
+          <div id="dirLinks" class="text-sm space-y-2"><p>Se generan links a Google Maps por tramos.</p></div>
+        </div>
       </aside>
     </section>
   </div>
