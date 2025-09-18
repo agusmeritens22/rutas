@@ -1,8 +1,7 @@
 /* ==========================================================
-   SOLGISTICA · app.js (integrado)
-   - Mantiene tu flujo original (parseo → geocoder → cronograma → impresión)
-   - Integra: enlaces de navegación robustos + soporte Ruta circular
-   - Divide ruta completa en chunks de hasta 10 puntos por URL
+   SOLGISTICA · app.js (integrado + FIX de "Estado")
+   - Actualiza #status en cada paso (ya no queda en "Esperando entradas…")
+   - Mantiene enlaces robustos + ruta circular + todo el flujo original
    ========================================================== */
 
 (function(){
@@ -27,6 +26,9 @@
   const inputTable = $("#inputTable");
   const resultsEl = $("#results");
   const dirLinksEl = $("#dirLinks");
+  const statusEl = $("#status");              // <-- FIX: referencia al estado
+  const autoRunEl = $("#autoRun");            // si existe, lo usamos
+  const circularEl = $("#circular");
 
   const avgSpeedEl = $("#avgSpeed");
   const defaultDwellEl = $("#defaultDwell");
@@ -34,10 +36,15 @@
   const defaultOpenEl = $("#defaultOpen");
   const defaultCloseEl = $("#defaultClose");
   const enforceWindowsEl = $("#enforceWindows");
-  const circularEl = $("#circular");
 
   /* ---------- Estado ---------- */
   const state = { rawRows:[], schedule:[], totalKm:0, totalMin:0 };
+
+  /* ---------- Estado helpers ---------- */
+  function setStatus(msg){
+    if (!statusEl) return;
+    statusEl.textContent = msg;
+  }
 
   /* ==========================================================
      Geocoder (OpenCage)
@@ -287,24 +294,31 @@
      ========================================================== */
   async function updateFromText(){
     try{
+      setStatus("Leyendo entradas…");
       state.rawRows = parseInputText();
-      if(!state.rawRows.length){
+      const n = state.rawRows.length;
+      if(!n){
         renderTable();
         resultsEl.innerHTML = `<p class="text-slate-700">Aún sin resultados.</p>`;
         updateNavLinksAndAPI([]);
+        setStatus("Esperando entradas…");
         return;
       }
+      setStatus(`Procesando ${n} punto${n>1?'s':''}…`);
 
       // Geocodificar faltantes
-      for(const r of state.rawRows){
+      for(let idx=0; idx<state.rawRows.length; idx++){
+        const r = state.rawRows[idx];
         if(!r.lat || !r.lng){
+          setStatus(`Geocodificando ${idx+1}/${n}…`);
           const g = await geocode(r.address);
           if(g) Object.assign(r,g);
-          await sleep(40);
+          await sleep(30);
         }
       }
 
       renderTable();
+      setStatus("Generando cronograma…");
 
       // Cronograma + totales
       state.schedule = buildSchedule(state.rawRows);
@@ -317,14 +331,17 @@
       renderResultsSummary({ stops: state.rawRows.length, km: state.totalKm, min: state.totalMin });
 
       // Enlaces navegación (con circular si aplica)
+      setStatus("Armando enlaces de navegación…");
       const points = state.rawRows.map(r=> (typeof r.address==="string" && r.address.trim())
         ? { address:r.address.trim() }
         : (typeof r.lat==="number" && typeof r.lng==="number" ? {lat:r.lat, lng:r.lng} : null)
       ).filter(Boolean);
       updateNavLinksAndAPI(points);
 
+      setStatus("Listo ✅");
     }catch(e){
       console.error(e);
+      setStatus("Ocurrió un error. Revisá la consola.");
       alert("Ocurrió un error procesando las direcciones.");
     }
   }
@@ -340,6 +357,7 @@
     renderTable();
     resultsEl.innerHTML = `<p class="text-slate-700">Aún sin resultados.</p>`;
     updateNavLinksAndAPI([]);
+    setStatus("Esperando entradas…");
   });
   $("#copyOrder")?.addEventListener("click", async ()=>{
     if(!state.rawRows.length) return alert("Primero cargá direcciones.");
@@ -356,7 +374,7 @@
     const a = document.createElement("a"); a.href=url; a.download="ruta.csv"; a.click(); URL.revokeObjectURL(url);
   });
 
-  // Impresión de cronograma (mantengo tu comportamiento original si lo usabas)
+  // Impresión de cronograma (si tenés un botón #printBtn)
   $("#printBtn")?.addEventListener("click", ()=>{
     if(!state.schedule.length) return alert("Generá el cronograma primero.");
     const rows = state.schedule.map(s=>`
@@ -384,6 +402,17 @@
     w.document.open(); w.document.write(html); w.document.close();
   });
 
-  // Auto-init si querés que procese al pegar y tocar "Pegar y Optimizar"
-  // Puedes enganchar también onChange del textarea si lo preferís.
+  // Auto: si existe #autoRun, al pegar texto se dispara el update
+  linksTA?.addEventListener("input", ()=>{
+    const lines = (linksTA.value||"").split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+    setStatus(lines.length ? `Detectadas ${lines.length} línea(s)…` : "Esperando entradas…");
+    if (autoRunEl?.checked && lines.length) {
+      // Debounce simple
+      clearTimeout(window.__autoRunTO);
+      window.__autoRunTO = setTimeout(updateFromText, 400);
+    }
+  });
+
+  // Estado inicial
+  setStatus("Esperando entradas…");
 })();
