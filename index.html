@@ -7,506 +7,88 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <meta name="theme-color" content="#000000" />
   <link rel="manifest" href="manifest.webmanifest?v=15">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,'Liberation Mono','Courier New',monospace}
-    .container{max-width:90rem;margin-left:auto;margin-right:auto}
+    body{
+      font-family:'Inter', ui-sans-serif, system-ui;
+      background:url('./fondo.jpg') no-repeat center center fixed;
+      background-size:cover;
+      color:#0f172a;
+    }
+    .card{
+      position:relative;
+      background:rgba(255,255,255,.15);
+      border-radius:1rem;
+      border:1px solid rgba(255,255,255,.35);
+      box-shadow:0 20px 50px rgba(0,0,0,.2);
+      padding:1.25rem;
+      backdrop-filter:blur(14px) saturate(180%);
+      -webkit-backdrop-filter:blur(14px) saturate(180%);
+    }
+    @media(min-width:640px){.card{padding:1.5rem;}}
+    .glass-strong{
+      background:rgba(255,255,255,.25);
+      border-color:rgba(255,255,255,.45);
+      backdrop-filter:blur(20px) saturate(200%);
+      -webkit-backdrop-filter:blur(20px) saturate(200%);
+    }
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;padding:.6rem .9rem;border-radius:1rem;font-weight:600;transition:transform .12s ease, box-shadow .2s;}
+    .btn:hover{transform:translateY(-1px)}
+    .btn-primary{color:white;background:linear-gradient(135deg,#0ea5e9,#0369a1)}
+    .btn-secondary{color:white;background:linear-gradient(135deg,#f59e0b,#b45309)}
+    .btn-danger{color:white;background:linear-gradient(135deg,#ef4444,#b91c1c)}
+    .btn-soft{background:#f1f5f9;color:#0f172a}
+    .chip{backdrop-filter:saturate(120%) blur(6px);background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.28);border-radius:9999px;padding:.35rem .6rem}
   </style>
 </head>
-<body class="bg-slate-50 text-slate-800">
-  <!-- Encabezado SOLGISTICA con banner responsive -->
-  <header class="relative w-full h-24 sm:h-32 lg:h-48 bg-center bg-cover" style="background-image: url('./banner.png');">
+<body class="antialiased">
+  <header class="relative w-full h-24 sm:h-32 lg:h-48 bg-center bg-cover" style="background-image:url('./banner.png');">
     <div class="relative container flex items-center justify-end h-full px-4 py-3 text-white gap-2">
-      <span id="userEmail" class="px-2 py-1 rounded bg-white/10 text-xs sm:text-sm hidden"></span>
-      <button id="signOutBtn" class="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs sm:text-sm hidden">CERRAR SESIÓN</button>
+      <span id="userEmail" class="chip text-xs sm:text-sm hidden"></span>
+      <button id="signOutBtn" class="btn btn-soft text-xs sm:text-sm hidden">CERRAR SESIÓN</button>
     </div>
   </header>
 
-  <!-- Hero (texto)  -->
-  <div class="px-4 sm:px-6 container mt-3">
-    <div class="rounded-xl border border-slate-200 bg-white px-4 py-3">
-      <h1 class="text-base sm:text-lg font-semibold">Planificador de Rutas</h1>
-      <p class="text-xs sm:text-sm text-slate-600">Optimización con ventanas horarias + guardado en la nube</p>
-    </div>
-  </div>
-
-  <!-- 🔒 Gate de autenticación (overlay) -->
-  <style>
-    #authGate { position:fixed; inset:0; background:rgba(0,0,0,0.65); backdrop-filter:blur(2px); z-index:9999; }
-  </style>
-  <div id="authGate" class="flex">
-    <div class="bg-white rounded-xl shadow-xl p-6 w-[90%] max-w-sm text-center m-auto">
-      <h2 class="text-lg font-semibold mb-2">Iniciar sesión</h2>
-      <p class="text-sm text-slate-600 mb-4">Elegí cómo entrar para usar la app.</p>
-
-      <div class="space-y-2 text-left">
-        <label class="block text-sm">Email</label>
-        <input id="emailInput" type="email" class="w-full p-2 border rounded-lg text-sm" placeholder="tu@email.com" />
-        <label class="block text-sm mt-2">Contraseña</label>
-        <input id="passInput" type="password" class="w-full p-2 border rounded-lg text-sm" placeholder="••••••••" />
-      </div>
-
-      <div class="mt-3 grid grid-cols-2 gap-2">
-        <button id="emailSignIn" class="px-3 py-2 rounded-lg bg-slate-800 text-white hover:bg-slate-900 text-sm">Entrar</button>
-        <button id="emailSignUp" class="px-3 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 text-sm">Crear cuenta</button>
-      </div>
-      <button id="emailReset" class="mt-2 text-xs text-sky-700 hover:underline">Olvidé mi contraseña</button>
-
-      <div class="my-4 flex items-center gap-3 text-xs text-slate-400">
-        <div class="flex-1 h-px bg-slate-200"></div> o <div class="flex-1 h-px bg-slate-200"></div>
-      </div>
-
-      <button id="googleSignIn" class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 w-full">Entrar con Google</button>
-      <p id="authError" class="text-xs text-red-600 mt-3 hidden"></p>
-    </div>
-  </div>
-
-  <!-- App -->
-  <div id="app" class="container p-4 sm:p-6">
+  <div class="container p-4 sm:p-6">
     <section class="grid grid-cols-1 xl:grid-cols-3 gap-4 xl:gap-6">
-      <!-- Columna izquierda: entradas y tabla -->
       <div class="xl:col-span-2 space-y-6">
-        <div class="bg-white rounded-2xl shadow p-4 sm:p-5">
-          <label for="links" class="block text-sm font-medium mb-2">Direcciones o links (uno por línea):</label>
-          <textarea id="links" class="w-full h-44 p-3 border rounded-xl mono text-sm focus:outline-none focus:ring-2 focus:ring-sky-600" placeholder="Formato recomendado: Nombre (Opcional) | Dirección, Ciudad, Provincia."></textarea>
-
-          <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
-            <label class="text-sm flex items-center gap-2">
-              <input id="autoRun" type="checkbox" class="w-4 h-4 rounded" rounded>
-              Auto-geocodificar y optimizar
-            </label>
-            <div class="flex items-center gap-2">
-              <label class="text-sm" for="avgSpeed">Velocidad media (km/h):</label>
-              <input id="avgSpeed" type="number" min="1" step="1" value="40" class="w-24 p-2 border rounded-lg text-sm" />
-            </div>
-            <div class="flex items-center gap-2">
-              <label class="text-sm" for="defaultDwell">Estadía por parada (min):</label>
-              <input id="defaultDwell" type="number" min="0" step="1" value="10" class="w-24 p-2 border rounded-lg text-sm" />
-            </div>
-            <div class="flex items-center gap-2">
-              <label class="text-sm" for="startTime">Hora de inicio:</label>
-              <input id="startTime" type="time" class="p-2 border rounded-lg text-sm" value="08:00" />
-            </div>
-            <div class="flex items-center gap-2">
-              <label class="text-sm" for="defaultOpen">Apertura (default):</label>
-              <input id="defaultOpen" type="time" class="p-2 border rounded-lg text-sm" placeholder="08:00" />
-            </div>
-            <div class="flex items-center gap-2">
-              <label class="text-sm" for="defaultClose">Cierre (default):</label>
-              <input id="defaultClose" type="time" class="p-2 border rounded-lg text-sm" placeholder="18:00" />
-            </div>
-            <label class="text-sm flex items-center gap-2">
-              <input id="useGeo" type="checkbox" class="w-4 h-4 rounded">
-              Usar mi ubicación como inicio
-            </label>
-            <label class="text-sm flex items-center gap-2">
-              <input id="circular" type="checkbox" class="w-4 h-4 rounded">
-              Ruta circular
-            </label>
-            <label class="text-sm flex items-center gap-2">
-              <input id="enforceWindows" type="checkbox" class="w-4 h-4 rounded" checked>
-              Respetar ventanas horarias
-            </label>
-          </div>
-
+        <div class="card">
+          <label for="links" class="block text-sm font-medium mb-2">Direcciones o links:</label>
+          <textarea id="links" class="w-full h-44"></textarea>
           <div class="mt-4 flex flex-wrap gap-3">
-            <button id="oneClick" class="px-4 py-2 rounded-xl bg-sky-700 text-white shadow hover:bg-sky-800">Pegar y Optimizar</button>
-            <button id="updateBtn" class="px-4 py-2 rounded-xl bg-amber-500 text-white hover:bg-amber-600">Actualizar</button>
-            <button id="clearBtn" class="px-4 py-2 rounded-xl bg-slate-200 text-slate-800 hover:bg-slate-300">Limpiar</button>
+            <button id="oneClick" class="btn btn-primary">Pegar y Optimizar</button>
+            <button id="updateBtn" class="btn btn-secondary">Actualizar</button>
+            <button id="clearBtn" class="btn btn-soft">Limpiar</button>
           </div>
         </div>
-
-        <!-- Tabla editable -->
-        <div id="inputTableWrap" class="bg-white rounded-2xl shadow p-4 sm:p-5 hidden">
+        <div class="card hidden" id="inputTableWrap">
           <h2 class="text-lg font-semibold mb-3">Puntos detectados</h2>
-          <div class="overflow-x-auto">
-            <table class="min-w-full text-xs md:text-sm">
-              <thead>
-                <tr class="text-left text-slate-600">
-                  <th class="py-2 pr-3">#</th>
-                  <th class="py-2 pr-3">Local</th>
-                  <th class="py-2 pr-3">Dirección</th>
-                  <th class="py-2 pr-3">Lat</th>
-                  <th class="py-2 pr-3">Lng</th>
-                  <th class="py-2 pr-3">Precisión</th>
-                  <th class="py-2 pr-3">Estadía</th>
-                  <th class="py-2 pr-3">Abre</th>
-                  <th class="py-2 pr-3">Cierra</th>
-                </tr>
-              </thead>
-              <tbody id="inputTable"></tbody>
-            </table>
-          </div>
-          <div class="mt-3 text-xs text-slate-500">
-            Podés editar <strong>Local</strong>, <strong>Abre/Cierra</strong> y <strong>Estadía</strong>. El cronograma usa estos valores.
-          </div>
+          <div class="overflow-x-auto"><table class="min-w-full text-xs md:text-sm"><thead><tr><th>#</th><th>Local</th><th>Dirección</th></tr></thead><tbody id="inputTable"></tbody></table></div>
         </div>
       </div>
-
-      <!-- Columna derecha: estado, guardar/cargar, links -->
       <aside class="xl:col-span-1 space-y-6">
-        <div class="bg-white rounded-2xl shadow p-4 sm:p-5">
+        <div class="card">
           <h3 class="font-semibold mb-2">Estado</h3>
-          <div id="status" class="text-xs text-slate-500">Esperando entradas…</div>
-
+          <div id="status" class="text-xs">Esperando entradas…</div>
           <h3 class="font-semibold mt-4 mb-2">Resultados</h3>
-          <div id="results" class="text-sm space-y-2"><p class="text-slate-500">Aún sin resultados.</p></div>
+          <div id="results" class="text-sm space-y-2"><p>Aún sin resultados.</p></div>
           <div class="mt-4 flex flex-col gap-2">
-            <button id="copyOrder" class="px-3 py-2 rounded-xl bg-slate-200 text-slate-800 hover:bg-slate-300">Copiar orden</button>
-            <button id="exportCsv" class="px-3 py-2 rounded-xl bg-sky-700 text-white hover:bg-sky-800">Exportar CSV</button>
+            <button id="copyOrder" class="btn btn-soft">Copiar orden</button>
+            <button id="exportCsv" class="btn btn-primary">Exportar CSV</button>
           </div>
         </div>
-
-        <div class="bg-white rounded-2xl shadow p-4 sm:p-5">
+        <div class="card">
           <h3 class="font-semibold mb-2">Rutas guardadas</h3>
-          <div class="grid grid-cols-1 gap-2">
-            <input id="routeName" type="text" class="p-2 border rounded-lg text-sm" placeholder="Nombre de la ruta" />
-            <div class="flex flex-wrap gap-2">
-              <button id="saveNamed" class="px-3 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">Guardar con nombre</button>
-              <button id="updateNamed" class="px-3 py-2 rounded-lg bg-emerald-100 text-emerald-900 hover:bg-emerald-200">Actualizar</button>
-              <button id="syncNow" class="px-3 py-2 rounded-lg bg-sky-100 text-sky-900 hover:bg-sky-200">Sincronizar ahora</button>
-            </div>
-            <div class="flex items-center gap-2 mt-2">
-              <select id="savedSelect" class="flex-1 p-2 border rounded-lg text-sm"></select>
-            </div>
-            <div class="flex flex-wrap gap-2 mt-1">
-              <button id="loadNamed" class="px-3 py-2 rounded-lg bg-slate-800 text-white hover:bg-slate-900">Cargar</button>
-              <button id="renameNamed" class="px-3 py-2 rounded-lg bg-slate-200 text-slate-900 hover:bg-slate-300">Renombrar</button>
-              <button id="deleteNamed" class="px-3 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700">Borrar</button>
-              <button id="exportNamed" class="px-3 py-2 rounded-lg bg-sky-50 text-sky-900 hover:bg-sky-100">Exportar JSON</button>
-              <label class="px-3 py-2 rounded-lg bg-sky-50 text-sky-900 hover:bg-sky-100 cursor-pointer">
-                Importar JSON
-                <input id="importNamed" type="file" accept="application/json" class="hidden" />
-              </label>
-            </div>
+          <input id="routeName" type="text" placeholder="Nombre de la ruta" class="w-full" />
+          <div class="flex flex-wrap gap-2 mt-2">
+            <button id="saveNamed" class="btn btn-primary">Guardar</button>
+            <button id="updateNamed" class="btn btn-soft">Actualizar</button>
           </div>
-        </div>
-
-        <div class="bg-white rounded-2xl shadow p-4 sm:p-5">
-          <h3 class="font-semibold mb-2">Enlaces de navegación</h3>
-          <div id="dirLinks" class="text-sm space-y-2"><p class="text-slate-500">Se generan links a Google Maps por tramos.</p></div>
         </div>
       </aside>
     </section>
   </div>
-
-  <!-- Lógica de la app -->
-  <script src="app.js?v=15"></script>
-
-  <!-- Geocoder -->
-  <script>
-    window.GEOCODER = { provider: 'opencage', key: 'a24210fb3d144afc8d35ad8d5e339879' };
-  </script>
-
-  <!-- Firebase + login obligatorio (idéntico al anterior) -->
-  <script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
-  import { getAuth, onAuthStateChanged, setPersistence, browserLocalPersistence, inMemoryPersistence,
-           GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult,
-           createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, signOut } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js";
-  import { getFirestore, doc, setDoc, getDocs, collection, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore.js";
-
-  const qs = new URLSearchParams(location.search);
-  const DEBUG = qs.get('debug') === '1';
-  const dPanel = document.getElementById('debugPanel');
-  const dLog = document.getElementById('debugLog');
-  function dbg(...args){ if(!DEBUG) return; dPanel.style.display='block'; const line = args.map(a=> (typeof a==='object'? JSON.stringify(a): String(a))).join(' '); dLog.textContent += `
-${new Date().toISOString().slice(11,19)} ${line}`; dLog.scrollTop = dLog.scrollHeight; console.log('[DBG]', ...args); }
-
-  const firebaseConfig = {
-    apiKey: "AIzaSyBMo1tBOmXVhY6QwgWbzvfAndltp9k4NZk",
-    authDomain: "rutas-da064.firebaseapp.com",
-    projectId: "rutas-da064",
-    storageBucket: "rutas-da064.appspot.com",
-    messagingSenderId: "126930065003",
-    appId: "1:126930065003:web:1a40af65ab7f6b9afe832e"
-  };
-
-  const app  = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
-  const db   = getFirestore(app);
-  window._firebase = { db, auth, onAuthStateChanged, doc, setDoc, getDocs, collection, updateDoc, deleteDoc };
-
-  const gate = document.getElementById('authGate');
-  const btnGoogle  = document.getElementById('googleSignIn');
-  const btnEmailIn = document.getElementById('emailSignIn');
-  const btnEmailUp = document.getElementById('emailSignUp');
-  const btnReset   = document.getElementById('emailReset');
-  const emailEl    = document.getElementById('emailInput');
-  const passEl     = document.getElementById('passInput');
-  const userEmailEl = document.getElementById('userEmail');
-  const signOutBtn  = document.getElementById('signOutBtn');
-  const err        = document.getElementById('authError');
-
-  function showGate(msg=''){
-    gate.style.display='flex';
-    gate.classList.remove('hidden');
-    if(msg){ err.textContent=msg; err.classList.remove('hidden'); }
-  }
-  function hideGate(){
-    gate.style.display='none';
-    gate.classList.add('hidden');
-    err.classList.add('hidden');
-    err.textContent='';
-  }
-  function showError(e){
-    const map = {
-      'auth/user-not-found':'Usuario no encontrado',
-      'auth/wrong-password':'Contraseña incorrecta',
-      'auth/invalid-email':'Email inválido',
-      'auth/email-already-in-use':'Ese email ya está en uso',
-      'auth/weak-password':'La contraseña es muy corta',
-    };
-    const msg = map[e?.code] || (e?.message || 'Error de autenticación');
-    err.textContent = msg; err.classList.remove('hidden'); dbg('auth error', e?.code||e);
-  }
-
-  const isIOS = /iPad|iPhone|iPod/i.test(navigator.userAgent);
-  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-  dbg('UA', navigator.userAgent, {isIOS, isSafari, host: location.host});
-
-  // Persistencia: inMemory en iOS/Safari para evitar ITP
-  try {
-    if (isIOS || isSafari) {
-      await setPersistence(auth, inMemoryPersistence);
-      dbg('setPersistence inMemory (iOS/Safari) OK');
-    } else {
-      await setPersistence(auth, browserLocalPersistence);
-      dbg('setPersistence local OK');
-    }
-  } catch(e){ dbg('setPersistence error', e?.code||e); }
-
-  // ===== Email/Password auth =====
-  btnEmailIn?.addEventListener('click', async () => {
-    err.classList.add('hidden'); err.textContent='';
-    try {
-      const email = emailEl.value.trim();
-      const pass  = passEl.value;
-      if(!email || !pass) return showError({message:'Completá email y contraseña'});
-      const { user } = await signInWithEmailAndPassword(auth, email, pass);
-      dbg('email signIn ->', user.uid);
-      hideGate();
-    } catch (e) { showError(e); }
-  });
-
-  btnEmailUp?.addEventListener('click', async () => {
-    err.classList.add('hidden'); err.textContent='';
-    try {
-      const email = emailEl.value.trim();
-      const pass  = passEl.value;
-      if(!email || !pass) return showError({message:'Completá email y contraseña'});
-      const { user } = await createUserWithEmailAndPassword(auth, email, pass);
-      dbg('email signUp ->', user.uid);
-      hideGate();
-    } catch (e) { showError(e); }
-  });
-
-  btnReset?.addEventListener('click', async () => {
-    try {
-      const email = emailEl.value.trim();
-      if(!email) return showError({message:'Ingresá tu email para enviar el link'});
-      await sendPasswordResetEmail(auth, email);
-      err.textContent = 'Te enviamos un link para restablecer la contraseña.'; err.classList.remove('hidden');
-    } catch(e){ showError(e); }
-  });
-
-  // ===== Google (opcional) =====
-  const provider = new GoogleAuthProvider();
-  if (!(isIOS || isSafari)) provider.setCustomParameters({ prompt:'select_account' });
-
-  const REDIRECT_FLAG = 'authRedirectPending';
-
-  async function tryGetRedirectResult(tag){
-    try {
-      const rr = await getRedirectResult(auth);
-      if (rr?.user) { hideGate(); dbg(`${tag} getRedirectResult -> user`, {uid: rr.user.uid}); return true; }
-      dbg(`${tag} getRedirectResult -> no user`); return false;
-    } catch (e) { dbg(`${tag} getRedirectResult error`, e?.code||e); return false; }
-  }
-
-  btnGoogle?.addEventListener('click', async () => {
-    err.classList.add('hidden'); err.textContent='';
-    try {
-      dbg('try popup first');
-      await signInWithPopup(auth, provider);
-      dbg('popup ok');
-    } catch (e) {
-      dbg('popup failed', e?.code||e);
-      sessionStorage.setItem(REDIRECT_FLAG, '1');
-      try { dbg('fallback to redirect'); await signInWithRedirect(auth, provider); } catch(e2){ dbg('redirect fallback failed', e2?.code||e2); }
-    }
-  });
-
-  // Estado global
-  onAuthStateChanged(auth, (user) => {
-    dbg('onAuthStateChanged', !!user, user?.uid);
-    if (user && !user.isAnonymous) {
-      if (userEmailEl){ userEmailEl.textContent = user.email || 'Usuario'; userEmailEl.classList.remove('hidden'); }
-      if (signOutBtn){ signOutBtn.classList.remove('hidden'); }
-      hideGate();
-      window.cloudSyncToLocal?.();
-    } else {
-      if (userEmailEl){ userEmailEl.textContent = ''; userEmailEl.classList.add('hidden'); }
-      if (signOutBtn){ signOutBtn.classList.add('hidden'); }
-      showGate();
-    }
-  });
-
-  // Reintentos post-redirect (iOS)
-  window.addEventListener('pageshow', async (ev) => {
-    if (isIOS || ev.persisted) {
-      dbg('pageshow (persisted=', !!ev.persisted, ') currentUser=', !!auth.currentUser);
-      if (!auth.currentUser) { await tryGetRedirectResult('pageshow'); }
-    }
-  });
-
-  document.addEventListener('visibilitychange', async () => {
-    if (!document.hidden && !auth.currentUser) { dbg('visibilitychange -> retry'); await tryGetRedirectResult('visibility'); }
-  });
-
-  // Cerrar sesión
-  signOutBtn?.addEventListener('click', async () => {
-    try { await signOut(auth); dbg('signOut ok'); } catch(e){ dbg('signOut error', e?.code||e); }
-  });
-</script>
-
-  <!-- Service Worker -->
-  <script>
-    if('serviceWorker' in navigator){
-      window.addEventListener('load', ()=>{ navigator.serviceWorker.register('./sw.js?v=15'); });
-    }
-  </script>
-  
-  <!-- Debug panel (se muestra con ?debug=1) -->
-  <div id="debugPanel" style="display:none; position:fixed; bottom:8px; right:8px; z-index:99999; max-width:90vw;">
-    <div style="background:#0b1220;color:#cde3ff;border:1px solid #122c5a;border-radius:10px;padding:10px; font:12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; box-shadow:0 6px 20px rgba(0,0,0,.25)">
-      <div style="font-weight:700;margin-bottom:6px">Auth Debug</div>
-      <pre id="debugLog" style="margin:0;white-space:pre-wrap;max-height:40vh;overflow:auto"></pre>
-    </div>
-  </div>
-
-  <!-- Lógica de la app -->
-  <script src="app.js?v=15"></script>
-
-  <!-- Geocoder -->
-  <script>
-    window.GEOCODER = { provider: 'opencage', key: 'a24210fb3d144afc8d35ad8d5e339879' };
-  </script>
-
-  <!-- Firebase + login (versión reforzada iOS/Safari con panel de debug) -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
-    import { getAuth, onAuthStateChanged, setPersistence, browserLocalPersistence, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js";
-    import { getFirestore, doc, setDoc, getDocs, collection, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore.js";
-
-    const qs = new URLSearchParams(location.search);
-    const DEBUG = qs.get('debug') === '1';
-    const dPanel = document.getElementById('debugPanel');
-    const dLog = document.getElementById('debugLog');
-    function dbg(...args){ if(!DEBUG) return; dPanel.style.display='block'; const line = args.map(a=> (typeof a==='object'? JSON.stringify(a): String(a))).join(' '); dLog.textContent += `
-${new Date().toISOString().slice(11,19)} ${line}`; dLog.scrollTop = dLog.scrollHeight; console.log('[DBG]', ...args); }
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyBMo1tBOmXVhY6QwgWbzvfAndltp9k4NZk",
-      authDomain: "rutas-da064.firebaseapp.com",
-      projectId: "rutas-da064",
-      storageBucket: "rutas-da064.appspot.com",
-      messagingSenderId: "126930065003",
-      appId: "1:126930065003:web:1a40af65ab7f6b9afe832e"
-    };
-
-    const app  = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db   = getFirestore(app);
-    window._firebase = { db, auth, onAuthStateChanged, doc, setDoc, getDocs, collection, updateDoc, deleteDoc };
-
-    const gate = document.getElementById('authGate');
-    const btn  = document.getElementById('googleSignIn');
-    const err  = document.getElementById('authError');
-
-    function showGate(msg=''){
-      gate.style.display='flex';
-      gate.classList.remove('hidden');
-      if(msg){ err.textContent=msg; err.classList.remove('hidden'); }
-    }
-    function hideGate(){
-      gate.style.display='none';
-      gate.classList.add('hidden');
-      err.classList.add('hidden');
-      err.textContent='';
-    }
-
-    try { await setPersistence(auth, browserLocalPersistence); dbg('setPersistence OK'); } catch(e){ dbg('setPersistence error', e?.code||e); }
-
-    const provider = new GoogleAuthProvider();
-    provider.setCustomParameters({ prompt:'select_account' });
-
-    const isIOS = /iPad|iPhone|iPod/i.test(navigator.userAgent);
-    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-    dbg('UA', navigator.userAgent, {isIOS, isSafari, host: location.host});
-
-    const REDIRECT_FLAG = 'authRedirectPending';
-    if (sessionStorage.getItem(REDIRECT_FLAG) === '1') { hideGate(); dbg('Flag pending redirect -> hide gate'); }
-
-    // Procesar resultado de redirect al cargar
-    try {
-      const rr = await getRedirectResult(auth);
-      if (rr?.user) { hideGate(); dbg('getRedirectResult -> user', {uid: rr.user.uid}); }
-      sessionStorage.removeItem(REDIRECT_FLAG);
-    } catch (e) {
-      dbg('getRedirectResult error', e?.code||e);
-      if (e?.code === 'auth/unauthorized-domain') {
-        showGate('Dominio no autorizado en Firebase Auth. Agregalo en Authentication → Settings → Authorized domains.');
-      }
-    }
-
-    onAuthStateChanged(auth, (user) => {
-      dbg('onAuthStateChanged', !!user, user?.uid);
-      if (user && !user.isAnonymous) { hideGate(); window.cloudSyncToLocal?.(); }
-      else { showGate(); }
-    });
-
-    btn?.addEventListener('click', async () => {
-      err.classList.add('hidden'); err.textContent='';
-      const useRedirect = isIOS || isSafari;
-      try {
-        if (useRedirect) {
-          sessionStorage.setItem(REDIRECT_FLAG, '1');
-          dbg('signInWithRedirect ...');
-          await signInWithRedirect(auth, provider);
-        } else {
-          dbg('signInWithPopup ...');
-          await signInWithPopup(auth, provider);
-        }
-      } catch (e) {
-        dbg('signIn error', e?.code||e);
-        sessionStorage.setItem(REDIRECT_FLAG, '1');
-        try { await signInWithRedirect(auth, provider); } catch(e2){ dbg('redirect fallback failed', e2?.code||e2); }
-      }
-    });
-
-    // iOS: al volver del redirect o desde el background, reintentar lectura
-    window.addEventListener('pageshow', async (ev) => {
-      if (isIOS || ev.persisted) {
-        dbg('pageshow (persisted=', !!ev.persisted, ') currentUser=', !!auth.currentUser);
-        if (!auth.currentUser) {
-          try { const rr = await getRedirectResult(auth); if (rr?.user) { hideGate(); dbg('pageshow -> got user'); } } catch {}
-        }
-      }
-    });
-
-    document.addEventListener('visibilitychange', async () => {
-      if (!document.hidden && !auth.currentUser) {
-        dbg('visibilitychange -> retry getRedirectResult');
-        try { const rr = await getRedirectResult(auth); if (rr?.user) hideGate(); } catch {}
-      }
-    });
-  </script>
-
-  <!-- Service Worker -->
-  <script>
-    if('serviceWorker' in navigator){
-      window.addEventListener('load', ()=>{ navigator.serviceWorker.register('./sw.js?v=15'); });
-    }
-  </script>
 </body>
 </html>
