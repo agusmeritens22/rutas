@@ -335,49 +335,52 @@
     signOutBtn?.addEventListener('click', async () => { try { await signOut(auth); dbg('signOut ok'); } catch(e){ dbg('signOut error', e?.code||e); } });
   </script>
 
-  <!-- ==========================================
-       Firebase compat (para namespace "firebase")
-       ========================================== -->
+  <!-- === Firebase compat (independiente del modular) === -->
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
   <script>
-    // Inicializar compat con la misma config (expuesta arriba)
-    if (window.firebaseConfig) {
-      firebase.initializeApp(window.firebaseConfig);
+    const firebaseConfig = {
+      apiKey: "AIzaSyBMo1tBOmXVhY6QwgWbzvfAndltp9k4NZk",
+      authDomain: "rutas-da064.firebaseapp.com",
+      projectId: "rutas-da064",
+      storageBucket: "rutas-da064.appspot.com",
+      messagingSenderId: "126930065003",
+      appId: "1:126930065003:web:1a40af65ab7f6b9afe832e"
+    };
+    // Siempre aseguramos compat
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
     }
+    // Exponer config por si modular la necesita
+    window.firebaseConfig = firebaseConfig;
   </script>
 
-  <!-- ====================
-       Bridge de autenticación
-       ==================== -->
+  <!-- === Bridge: asegura window.currentUserUid === -->
   <script>
-    /* Asegura window.currentUserUid en cualquier entorno (compat o timing lento) */
     (function(){
       function set(uid){ window.currentUserUid = uid || null; }
-      try{
-        if (window.firebase && firebase.auth) {
-          const auth = firebase.auth();
-          set(auth.currentUser?.uid || null);
-          auth.onAuthStateChanged(user => set(user?.uid || null));
-        }
-      }catch(e){}
-      // Fallback: polling corto por si auth inicializa después (Safari/iOS)
+      try {
+        const auth = firebase.auth();
+        set(auth.currentUser?.uid || null);
+        auth.onAuthStateChanged(u => set(u?.uid || null));
+      } catch (e) {}
+      // Fallback por timings lentos
       let tries = 0;
-      const t = setInterval(()=>{
+      const t = setInterval(() => {
         tries++;
-        try{
-          if (window.firebase && firebase.auth && firebase.auth().currentUser) {
-            set(firebase.auth().currentUser.uid); clearInterval(t);
-          }
-        }catch(_){}
+        try {
+          const u = firebase.auth().currentUser;
+          if (u) { set(u.uid); clearInterval(t); }
+        } catch(_) {}
         if (tries > 6) clearInterval(t);
       }, 500);
     })();
   </script>
 
-  <!-- ========= Tu app (debe ir DESPUÉS de Firebase y bridge) ========= -->
+  <!-- === Tu app (cargar DESPUÉS de compat + bridge) === -->
   <script src="app.js?v=firestore"></script>
+
 
   <!-- Service Worker -->
   <script>
