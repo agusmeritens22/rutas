@@ -10,19 +10,18 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Questrial&display=swap" rel="stylesheet">
   <meta name="theme-color" content="#000000" />
-  <link rel="manifest" href="manifest.webmanifest?v=15">
+  <link rel="manifest" href="manifest.webmanifest?v=16">
   <!-- Fuente moderna -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <style>
 
-    
+  <style>
     /* ===== Estilos base y fondo ===== */
     body{
       font-family:'Questrial', ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
-      background:url('./fondo.jpg') no-repeat center center fixed; /* tu fondo */
-      background-size:cover; /* cover para todas las pantallas */
+      background:url('./fondo.jpg') no-repeat center center fixed;
+      background-size:cover;
       color:#0f172a;
     }
     .container{max-width:90rem;margin-left:auto;margin-right:auto}
@@ -35,7 +34,7 @@
 
     /* ===== Controles modernos ===== */
     input[type="text"], input[type="number"], input[type="time"], input[type="email"], input[type="password"], select, textarea{
-      width:100%; background:#fff; border:1px solid #e2e8f0; border-radius:.9rem; padding:.625rem .75rem; font-size:0.95rem; transition:border-color .2s, box-shadow .2s, background .2s;
+      width:100%; background:#fff; border:1px solid #e2e8f0; border-radius:.9rem; padding:.625rem .75rem; font-size:0.95rem; transition:border-color .2s, box-shadow .2s, background .2s, color .2s;
     }
     textarea{ line-height:1.45; }
     input:focus, select:focus, textarea:focus{ outline:none; border-color:#38bdf8; box-shadow:0 0 0 4px rgba(56,189,248,.22); }
@@ -49,33 +48,10 @@
     .btn-google{ color:white; background:#ea4335; }
 
     .chip{ backdrop-filter:saturate(120%) blur(6px); background:rgba(255,255,255,.18); border:1px solid rgba(255,255,255,.28); border-radius:9999px; padding:.35rem .6rem; }
-  </style>
-
-  <style>
-    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,'Liberation Mono','Courier New',monospace}
-    .container{max-width:90rem;margin-left:auto;margin-right:auto}
-
     /* 🔥 Ajustes de tabla */
-    #inputTable th,
-    #inputTable td {
-      padding: 14px 16px;  /* más espacio interno */
-      text-align: left;
-      vertical-align: middle;
-    }
-
-    #inputTable input {
-      padding: 10px 14px;
-      font-size: 14px;
-      border-radius: 8px;
-      border: 1px solid #d1d5db;
-      width: 100%;
-    }
-
-    #inputTable td:first-child + td input {
-      min-width: 180px;   /* Local más grande */
-      font-weight: 500;
-      font-size: 15px;
-    }
+    #inputTable th, #inputTable td { padding: 14px 16px; text-align: left; vertical-align: middle; }
+    #inputTable input { padding: 10px 14px; font-size: 14px; border-radius: 8px; border: 1px solid #d1d5db; width: 100%; }
+    #inputTable td:first-child + td input { min-width: 180px; font-weight: 500; font-size: 15px; }
   </style>
 </head>
 <body class="antialiased">
@@ -88,9 +64,7 @@
   </header>
 
   <!-- ===== Gate de autenticación ===== -->
-  <style>
-    #authGate { position:fixed; inset:0; background:rgba(0,0,0,0.50); backdrop-filter:blur(2px); z-index:9999; }
-  </style>
+  <style>#authGate { position:fixed; inset:0; background:rgba(0,0,0,0.50); backdrop-filter:blur(2px); z-index:9999; }</style>
   <div id="authGate" class="flex">
     <div class="card glass-strong w-[90%] max-w-sm text-center m-auto">
       <h2 class="text-lg font-semibold mb-2">Iniciar sesión</h2>
@@ -173,8 +147,8 @@
           </div>
         </div>
 
-         <!-- Estado -->
-         <div class="card">
+        <!-- Estado + resultados -->
+        <div class="card">
           <h3 class="font-semibold mb-2">Estado</h3>
           <div id="status" class="text-xs">Esperando entradas…</div>
 
@@ -183,7 +157,6 @@
           <div class="mt-4 flex flex-col gap-2">
             <button id="copyOrder" class="btn btn-soft">Copiar orden</button>
             <button id="exportCsv" class="btn btn-primary">Exportar CSV</button>
-            <!-- NUEVO: abrir ruta en Google Maps -->
             <button id="openInGMaps" class="btn btn-primary">Ver en Google Maps</button>
           </div>
         </div>
@@ -215,10 +188,8 @@
         </div>
       </div>
 
-      <!-- Columna derecha: estado, guardar/cargar, links -->
+      <!-- Columna derecha: guardar/cargar + enlaces -->
       <aside class="xl:col-span-1 space-y-6">
-       
-
         <div class="card">
           <h3 class="font-semibold mb-2">Rutas guardadas</h3>
           <div class="grid grid-cols-1 gap-2">
@@ -260,17 +231,12 @@
     </div>
   </div>
 
-  <!-- ===== Scripts de la app ===== -->
-<!-- Helper: botón "Ver en Google Maps". Reutiliza los puntos optimizados que tengas en tu app. -->
+  <!-- Helper: botón "Ver en Google Maps". -->
   <script>
-    // API simple para que app.js nos pase los puntos optimizados en orden
-    // Usá window.setOptimizedPoints(lista) desde tu lógica cuando tengas lat/lng
     window._optimizedPoints = [];
     window.setOptimizedPoints = function(list){
-      // Espera objetos con address o {lat,lng}
       window._optimizedPoints = Array.isArray(list) ? list : [];
     };
-
     document.getElementById('openInGMaps')?.addEventListener('click', () => {
       const pts = window._optimizedPoints || [];
       if (!pts.length) { alert('Primero optimizá las direcciones'); return; }
@@ -283,12 +249,14 @@
     });
   </script>
 
-  <!-- Geocoder (igual que antes) -->
+  <!-- Geocoder -->
   <script>
     window.GEOCODER = { provider: 'opencage', key: 'a24210fb3d144afc8d35ad8d5e339879' };
   </script>
 
-  <!-- Firebase + login (email/contraseña y Google). Mantengo el bloque funcional anterior -->
+  <!-- ============================
+       Firebase v10 (modular, ESM)
+       ============================ -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
     import { getAuth, onAuthStateChanged, setPersistence, browserLocalPersistence, inMemoryPersistence,
@@ -311,7 +279,7 @@
       appId: "1:126930065003:web:1a40af65ab7f6b9afe832e"
     };
 
-    // Exponer también para compat
+    // 🔗 Exponer la config para el SDK compat
     window.firebaseConfig = firebaseConfig;
 
     const app  = initializeApp(firebaseConfig);
@@ -342,43 +310,79 @@
     btnEmailUp?.addEventListener('click', async () => { err.classList.add('hidden'); err.textContent=''; try { const { user } = await createUserWithEmailAndPassword(auth, emailEl.value.trim(), passEl.value); dbg('email signUp ->', user.uid); hideGate(); } catch (e) { showError(e); } });
     btnReset  ?.addEventListener('click', async () => { try { const email = emailEl.value.trim(); if(!email) return showError({message:'Ingresá tu email para enviar el link'}); await sendPasswordResetEmail(auth, email); err.textContent = 'Te enviamos un link para restablecer.'; err.classList.remove('hidden'); } catch(e){ showError(e); } });
 
-    // Google (opcional)
+    // Google
     const provider = new GoogleAuthProvider();
     btnGoogle?.addEventListener('click', async () => { err.classList.add('hidden'); err.textContent=''; try { dbg('try popup first'); await signInWithPopup(auth, provider); dbg('popup ok'); } catch (e) { dbg('popup failed', e?.code||e); try { await signInWithRedirect(auth, provider); } catch(e2){ dbg('redirect failed', e2?.code||e2); } } });
 
     // Estado global
-    onAuthStateChanged(auth, (user) => { dbg('onAuthStateChanged', !!user, user?.uid); if (user && !user.isAnonymous) { if (userEmailEl){ userEmailEl.textContent = user.email || 'Usuario'; userEmailEl.classList.remove('hidden'); } if (signOutBtn){ signOutBtn.classList.remove('hidden'); } hideGate(); window.cloudSyncToLocal?.(); } else { if (userEmailEl){ userEmailEl.textContent = ''; userEmailEl.classList.add('hidden'); } if (signOutBtn){ signOutBtn.classList.add('hidden'); } showGate(); } });
+    onAuthStateChanged(auth, (user) => {
+      dbg('onAuthStateChanged', !!user, user?.uid);
+      // Publicá el UID para la app (app.js usa window.currentUserUid)
+      window.currentUserUid = user?.uid || null;
+
+      if (user && !user.isAnonymous) {
+        if (userEmailEl){ userEmailEl.textContent = user.email || 'Usuario'; userEmailEl.classList.remove('hidden'); }
+        if (signOutBtn){ signOutBtn.classList.remove('hidden'); }
+        hideGate();
+        window.cloudSyncToLocal?.();
+      } else {
+        if (userEmailEl){ userEmailEl.textContent = ''; userEmailEl.classList.add('hidden'); }
+        if (signOutBtn){ signOutBtn.classList.add('hidden'); }
+        showGate();
+      }
+    });
 
     signOutBtn?.addEventListener('click', async () => { try { await signOut(auth); dbg('signOut ok'); } catch(e){ dbg('signOut error', e?.code||e); } });
   </script>
-  <!-- Firebase compat (para que app.js funcione con namespace global) -->
+
+  <!-- ==========================================
+       Firebase compat (para namespace "firebase")
+       ========================================== -->
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
   <script>
-    // Inicializamos también el namespace compat para que app.js (Firestore Sync) lo use
+    // Inicializar compat con la misma config (expuesta arriba)
     if (window.firebaseConfig) {
       firebase.initializeApp(window.firebaseConfig);
-    } else {
-      // Si no existe, duplicamos la config (misma que la del módulo)
-      firebase.initializeApp({
-        apiKey: "AIzaSyBMo1tBOmXVhY6QwgWbzvfAndltp9k4NZk",
-        authDomain: "rutas-da064.firebaseapp.com",
-        projectId: "rutas-da064",
-        storageBucket: "rutas-da064.appspot.com",
-        messagingSenderId: "126930065003",
-        appId: "1:126930065003:web:1a40af65ab7f6b9afe832e"
-      });
     }
   </script>
 
+  <!-- ====================
+       Bridge de autenticación
+       ==================== -->
+  <script>
+    /* Asegura window.currentUserUid en cualquier entorno (compat o timing lento) */
+    (function(){
+      function set(uid){ window.currentUserUid = uid || null; }
+      try{
+        if (window.firebase && firebase.auth) {
+          const auth = firebase.auth();
+          set(auth.currentUser?.uid || null);
+          auth.onAuthStateChanged(user => set(user?.uid || null));
+        }
+      }catch(e){}
+      // Fallback: polling corto por si auth inicializa después (Safari/iOS)
+      let tries = 0;
+      const t = setInterval(()=>{
+        tries++;
+        try{
+          if (window.firebase && firebase.auth && firebase.auth().currentUser) {
+            set(firebase.auth().currentUser.uid); clearInterval(t);
+          }
+        }catch(_){}
+        if (tries > 6) clearInterval(t);
+      }, 500);
+    })();
+  </script>
 
-  <script src="app.js?v=15"></script>
+  <!-- ========= Tu app (debe ir DESPUÉS de Firebase y bridge) ========= -->
+  <script src="app.js?v=firestore"></script>
 
   <!-- Service Worker -->
   <script>
     if('serviceWorker' in navigator){
-      window.addEventListener('load', ()=>{ navigator.serviceWorker.register('./sw.js?v=15'); });
+      window.addEventListener('load', ()=>{ navigator.serviceWorker.register('./sw.js?v=16'); });
     }
   </script>
 </body>
