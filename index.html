@@ -261,9 +261,7 @@
   </div>
 
   <!-- ===== Scripts de la app ===== -->
-  <script src="app.js?v=15"></script>
-
-  <!-- Helper: botón "Ver en Google Maps". Reutiliza los puntos optimizados que tengas en tu app. -->
+<!-- Helper: botón "Ver en Google Maps". Reutiliza los puntos optimizados que tengas en tu app. -->
   <script>
     // API simple para que app.js nos pase los puntos optimizados en orden
     // Usá window.setOptimizedPoints(lista) desde tu lógica cuando tengas lat/lng
@@ -313,6 +311,9 @@
       appId: "1:126930065003:web:1a40af65ab7f6b9afe832e"
     };
 
+    // Exponer también para compat
+    window.firebaseConfig = firebaseConfig;
+
     const app  = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db   = getFirestore(app);
@@ -350,6 +351,29 @@
 
     signOutBtn?.addEventListener('click', async () => { try { await signOut(auth); dbg('signOut ok'); } catch(e){ dbg('signOut error', e?.code||e); } });
   </script>
+  <!-- Firebase compat (para que app.js funcione con namespace global) -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+  <script>
+    // Inicializamos también el namespace compat para que app.js (Firestore Sync) lo use
+    if (window.firebaseConfig) {
+      firebase.initializeApp(window.firebaseConfig);
+    } else {
+      // Si no existe, duplicamos la config (misma que la del módulo)
+      firebase.initializeApp({
+        apiKey: "AIzaSyBMo1tBOmXVhY6QwgWbzvfAndltp9k4NZk",
+        authDomain: "rutas-da064.firebaseapp.com",
+        projectId: "rutas-da064",
+        storageBucket: "rutas-da064.appspot.com",
+        messagingSenderId: "126930065003",
+        appId: "1:126930065003:web:1a40af65ab7f6b9afe832e"
+      });
+    }
+  </script>
+
+
+  <script src="app.js?v=15"></script>
 
   <!-- Service Worker -->
   <script>
